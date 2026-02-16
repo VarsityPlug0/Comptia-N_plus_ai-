@@ -1,19 +1,15 @@
 /**
- * auth.js – Simple client-side authentication
+ * auth.js – Client-side authentication (credentials stored as SHA-256 hashes only)
  */
 
-// Hashed credentials (SHA-256) for basic obfuscation
-const AUTH_USERS = [
-    {
-        usernameHash: '8a9bcfd64d1f64e1a13d6f29bfa5b18c0e7bca6df3e28cc41c5e2e5fcb063587', // BevanPass
-        passwordHash: 'a1e2d3c4b5a6f7e8d9c0b1a2f3e4d5c6b7a8f9e0d1c2b3a4f5e6d7c8b9a0f1'  // placeholder
-    }
-];
+// Pre-computed SHA-256 hashes – no plaintext credentials in source
+const VALID_USER_HASH = 'da6e1484e704bfd56dd16271a38e2323143b78148b058709bad45661a77af552';
+const VALID_PASS_HASH = 'c150ae8a4184deb79af5cb2a8fd975a92524c4a83b4c9df9bf4fce27b09e12c3';
 
 const SESSION_KEY = 'netquiz_session';
 const SESSION_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 days
 
-// Simple hash function using Web Crypto API
+// SHA-256 hash using Web Crypto API
 async function sha256(text) {
     const encoder = new TextEncoder();
     const data = encoder.encode(text);
@@ -48,16 +44,12 @@ function getLoggedInUser() {
     }
 }
 
-// Authenticate user
+// Authenticate user – compares input hashes against stored hashes
 async function authenticate(username, password) {
     const uHash = await sha256(username);
     const pHash = await sha256(password);
 
-    // Check against known credentials
-    const validUser = (uHash === await sha256('BevanPass'));
-    const validPass = (pHash === await sha256('ShadowMan31@'));
-
-    if (validUser && validPass) {
+    if (uHash === VALID_USER_HASH && pHash === VALID_PASS_HASH) {
         const session = {
             username: username,
             timestamp: Date.now()

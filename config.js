@@ -5,7 +5,7 @@
 const CONFIG_KEY = 'quizAppConfig';
 
 const DEFAULT_CONFIG = {
-    apiKey: 'sk-67a4f452917b4432b5720861745296f9',
+    apiKey: '',  // User sets this in Settings → stored in localStorage only
     apiEndpoint: 'https://api.deepseek.com/v1/chat/completions',
     apiModel: 'deepseek-chat',
     explanationMode: 'beginner', // 'beginner' or 'technical'
