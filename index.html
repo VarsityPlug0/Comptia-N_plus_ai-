@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>NetQuiz – Smart Networking Study Coach</title>
+    <meta name="description" content="AI-powered networking quiz with progress tracking and learning roadmap">
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <div class="app-container">
+
+        <!-- Header -->
+        <header class="app-header">
+            <h1>⚡ NetQuiz</h1>
+            <p class="subtitle">Smart Networking Study Coach</p>
+            <nav class="header-nav">
+                <button class="nav-btn" onclick="goHome()" title="Home">🏠</button>
+                <button class="nav-btn" onclick="showDashboard()" title="Progress">📊</button>
+                <button class="nav-btn" onclick="showRoadmapView()" title="Roadmap">🗺️</button>
+                <button class="nav-btn" onclick="showSettings()" title="Settings">⚙️</button>
+            </nav>
+        </header>
+
+        <!-- Loading View -->
+        <div id="loading" class="view active">
+            <div class="loading-container">
+                <div class="spinner"></div>
+                <p>Loading questions…</p>
+            </div>
+        </div>
+
+        <!-- Home View -->
+        <div id="home" class="view">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <span class="stat-value" id="stat-total-quizzes">0</span>
+                    <span class="stat-label">Quizzes Taken</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-value" id="stat-avg-score">0%</span>
+                    <span class="stat-label">Avg Score</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-value">
+                        <span id="stat-questions-seen">0</span>
+                        <span style="font-size:0.875rem;color:var(--text-secondary)">/ <span
+                                id="stat-total-questions">0</span></span>
+                    </span>
+                    <span class="stat-label">Questions Covered</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-value" id="stat-streak">0🔥</span>
+                    <span class="stat-label">Day Streak</span>
+                </div>
+            </div>
+
+            <div class="card" id="mastery-summary"></div>
+
+            <p class="start-info" id="start-info">Loading…</p>
+
+            <div class="home-actions">
+                <button class="btn btn-primary btn-full" onclick="startQuiz()">▶ Continue (Next 10)</button>
+                <button class="btn btn-secondary btn-full" onclick="showModeSelector()">🎯 Practice Modes</button>
+                <div class="btn-row">
+                    <button class="btn btn-secondary" onclick="showDashboard()">📊 Progress</button>
+                    <button class="btn btn-secondary" onclick="showRoadmapView()">🗺️ Roadmap</button>
+                </div>
+            </div>
+            <p id="total-available" style="display:none"></p>
+        </div>
+
+        <!-- Mode Selection View -->
+        <div id="mode-select" class="view">
+            <div class="card">
+                <h2 class="section-title">Choose Practice Mode</h2>
+                <div id="mode-cards" class="mode-grid"></div>
+            </div>
+            <button class="btn btn-secondary btn-full" onclick="goHome()" style="margin-top:12px">← Back</button>
+        </div>
+
+        <!-- Quiz View -->
+        <div id="quiz" class="view">
+            <div class="exam-timer-bar" id="exam-timer-bar" style="display:none">
+                <span>⏱️ <span id="timer-display">90:00</span></span>
+                <span class="timer-label">Exam Mode</span>
+            </div>
+            <p class="progress-text" id="progress-text">Question 1 of 10</p>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progress-fill" style="width:10%"></div>
+            </div>
+            <div class="card" id="question-container"></div>
+            <div class="quiz-nav">
+                <div class="btn-group">
+                    <button class="btn btn-secondary" id="btn-prev" onclick="prevQuestion()">← Prev</button>
+                    <button class="btn btn-secondary" id="btn-next" onclick="nextQuestion()">Next →</button>
+                </div>
+                <button class="btn btn-primary" id="btn-submit" onclick="submitQuiz()">Submit Quiz</button>
+                <button class="btn btn-primary" id="btn-results" onclick="showResults()" style="display:none">View
+                    Results →</button>
+            </div>
+        </div>
+
+        <!-- Results View -->
+        <div id="results" class="view">
+            <div class="card" style="text-align:center">
+                <span class="mode-badge" id="results-mode-badge">Normal</span>
+                <h2 style="margin:8px 0 4px">Session Complete</h2>
+                <p style="color:var(--text-secondary);font-size:0.875rem">
+                    Streak: <span id="results-streak">0🔥</span>
+                </p>
+                <div class="score-ring-container">
+                    <div class="score-ring">
+                        <svg width="140" height="140">
+                            <circle class="score-ring-bg" cx="70" cy="70" r="54"></circle>
+                            <circle class="score-ring-progress" id="score-ring-progress" cx="70" cy="70" r="54"
+                                stroke-dasharray="339.29" stroke-dashoffset="339.29"></circle>
+                        </svg>
+                        <div class="score-ring-text">
+                            <span class="score-big" id="results-pct">0%</span>
+                            <span class="score-label" id="results-score">0 / 10</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card" id="results-incorrect"></div>
+            <div class="results-actions">
+                <button class="btn btn-secondary" onclick="redoSet(sessionStartIndex)">🔄 Redo Set</button>
+                <button class="btn btn-primary" onclick="startQuiz()">▶ Next Session</button>
+                <button class="btn btn-secondary" onclick="goHome()">← Home</button>
+            </div>
+        </div>
+
+        <!-- Dashboard View -->
+        <div id="dashboard" class="view">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <span class="stat-value" id="dash-total">0</span>
+                    <span class="stat-label">Total Quizzes</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-value" id="dash-avg">0%</span>
+                    <span class="stat-label">Avg Score</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-value" id="dash-streak-current">0</span>
+                    <span class="stat-label">Current Streak</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-value" id="dash-streak-best">0</span>
+                    <span class="stat-label">Best Streak</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-value" id="dash-best">—</span>
+                    <span class="stat-label">Best Session</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-value" id="dash-worst">—</span>
+                    <span class="stat-label">Worst Session</span>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3 class="section-title">Topic Mastery</h3>
+                <div id="topic-stats-container"></div>
+            </div>
+
+            <div class="card">
+                <h3 class="section-title">Session History</h3>
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Date</th>
+                                <th>Questions</th>
+                                <th>Score</th>
+                                <th>%</th>
+                                <th>Mode</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="session-history-body">
+                            <tr>
+                                <td colspan="7" class="empty-msg">No sessions yet</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3 class="section-title">Incorrect Answers Log</h3>
+                <div id="dash-incorrect-list">
+                    <p class="empty-msg">No incorrect answers recorded yet.</p>
+                </div>
+            </div>
+
+            <div class="results-actions">
+                <button class="btn btn-secondary" onclick="goHome()">← Home</button>
+                <button class="btn btn-danger" onclick="confirmResetProgress()">🗑 Reset Progress</button>
+            </div>
+        </div>
+
+        <!-- Roadmap View -->
+        <div id="roadmap" class="view">
+            <div class="card">
+                <div id="roadmap-content"></div>
+            </div>
+            <button class="btn btn-secondary btn-full" onclick="goHome()" style="margin-top:12px">← Home</button>
+        </div>
+
+        <!-- Settings View -->
+        <div id="settings" class="view">
+            <div class="card">
+                <h2 class="section-title">Settings</h2>
+
+                <div class="form-group">
+                    <label>DeepSeek API Key</label>
+                    <input type="password" id="input-api-key" class="form-input" placeholder="sk-...">
+                </div>
+
+                <div class="form-group">
+                    <label>API Endpoint</label>
+                    <input type="text" id="input-api-endpoint" class="form-input"
+                        placeholder="https://api.deepseek.com/v1/chat/completions">
+                </div>
+
+                <div class="form-group">
+                    <label>Model</label>
+                    <input type="text" id="input-api-model" class="form-input" placeholder="deepseek-chat">
+                </div>
+
+                <div class="form-group">
+                    <label>AI Explanation Mode</label>
+                    <div class="radio-group">
+                        <label class="radio-label">
+                            <input type="radio" name="explainMode" value="beginner" id="mode-beginner"> Beginner
+                            (simple, analogy-based)
+                        </label>
+                        <label class="radio-label">
+                            <input type="radio" name="explainMode" value="technical" id="mode-technical"> Technical
+                            (cert-level detail)
+                        </label>
+                    </div>
+                </div>
+
+                <hr class="divider">
+
+                <div class="form-group">
+                    <label>Exam Simulation Duration (minutes)</label>
+                    <input type="number" id="input-exam-duration" class="form-input" value="90" min="10" max="240">
+                </div>
+
+                <div class="form-group">
+                    <label>Exam Question Count</label>
+                    <input type="number" id="input-exam-count" class="form-input" value="60" min="10" max="200">
+                </div>
+
+                <div class="btn-row" style="margin-top:20px">
+                    <button class="btn btn-primary" onclick="saveSettings()">💾 Save Settings</button>
+                    <button class="btn btn-secondary" onclick="goHome()">Cancel</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Scripts (order matters: dependencies first) -->
+    <script src="config.js"></script>
+    <script src="tracking.js"></script>
+    <script src="parser.js"></script>
+    <script src="progress.js"></script>
+    <script src="ai.js"></script>
+    <script src="modes.js"></script>
+    <script src="roadmap.js"></script>
+    <script src="quiz.js"></script>
+</body>
+
+</html>
