@@ -647,4 +647,4 @@ function arraysEqual(a, b) {
 }
 
 // ─── Boot ───
-document.addEventListener('DOMContentLoaded', initApp);
+document.addEventListener('DOMContentLoaded', checkAuth);

@@ -1384,6 +1384,82 @@ tr:hover td {
     color: var(--text-muted);
 }
 
+/* ─── Login Screen ─── */
+.login-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 70vh;
+    padding: 20px;
+    text-align: center;
+}
+
+.login-logo {
+    font-size: 3.5rem;
+    margin-bottom: 8px;
+    animation: loginPulse 2s ease-in-out infinite;
+}
+
+@keyframes loginPulse {
+
+    0%,
+    100% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.1);
+    }
+}
+
+.login-title {
+    font-size: 2rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 4px;
+}
+
+.login-subtitle {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    margin-bottom: 24px;
+}
+
+.login-card {
+    width: 100%;
+    max-width: 380px;
+    text-align: left;
+}
+
+.login-card .form-group {
+    margin-bottom: 16px;
+}
+
+.login-card .form-input {
+    font-size: 1rem;
+    padding: 14px 16px;
+}
+
+.login-card .btn {
+    margin-top: 8px;
+    padding: 14px 24px;
+    font-size: 1rem;
+}
+
+.login-error {
+    color: var(--red);
+    font-size: 0.8125rem;
+    background: var(--red-bg);
+    padding: 10px 14px;
+    border-radius: var(--radius-sm);
+    margin-bottom: 8px;
+    border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
 /* ═══════════════════════════════════════════
    Responsive – Mobile-first for all devices
    ═══════════════════════════════════════════ */
