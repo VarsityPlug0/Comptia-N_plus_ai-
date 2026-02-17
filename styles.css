@@ -3041,6 +3041,42 @@ html {
     }
 }
 
+/* ─── History Expansion ─── */
+.history-details-row {
+    display: none;
+    background: var(--bg-secondary);
+}
+
+.history-details-row.active {
+    display: table-row;
+}
+
+.history-detail-content {
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border);
+}
+
+.history-row {
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.history-row:hover {
+    background: var(--bg-hover);
+}
+
+.history-row.active {
+    background: var(--bg-hover);
+    font-weight: 500;
+}
+
+.rotate-icon {
+    display: inline-block;
+    transition: transform 0.2s;
+    font-size: 0.8em;
+    margin-left: 4px;
+}
+
 /* ═══════════════════════════════════════════════════
    ACCORDION REVIEW SYSTEM
    ═══════════════════════════════════════════════════ */
@@ -3346,5 +3382,406 @@ html {
     .review-meta {
         flex-direction: column;
         gap: 4px;
+    }
+}
+
+/* ═══════════════════════════════════════════════════
+   MOBILE DASHBOARD REDESIGN
+   ═══════════════════════════════════════════════════ */
+
+/* ─── Hero Progress ─── */
+.dash-hero {
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(139, 92, 246, 0.08));
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px 20px;
+    margin-bottom: 14px;
+}
+
+.dash-hero-left {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+
+.dash-hero-label {
+    font-size: 0.8125rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.dash-hero-value {
+    font-size: 1.375rem;
+    font-weight: 700;
+    color: var(--accent);
+}
+
+.dash-hero-bar-wrap {
+    width: 100%;
+    height: 8px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.dash-hero-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #6366f1, #8b5cf6);
+    border-radius: 4px;
+    transition: width 0.5s ease;
+}
+
+/* ─── Compact Stat Chips ─── */
+.dash-stats-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-bottom: 14px;
+}
+
+.dash-stat-chip {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 8px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.dash-chip-val {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.dash-chip-label {
+    font-size: 0.6875rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.dash-stat-chip.accent .dash-chip-val {
+    color: var(--accent);
+}
+
+.dash-stat-chip.good .dash-chip-val {
+    color: #22c55e;
+}
+
+.dash-stat-chip.bad .dash-chip-val {
+    color: #ef4444;
+}
+
+/* ─── Latest Session Card ─── */
+.dash-latest-card {
+    border-left: 3px solid var(--accent);
+    margin-bottom: 14px;
+}
+
+.dash-latest-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+    gap: 10px;
+}
+
+.dash-latest-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+}
+
+.dash-latest-stat-label {
+    font-size: 0.6875rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+}
+
+.dash-latest-stat-val {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.dash-latest-stat-val.score-high {
+    color: #22c55e;
+}
+
+.dash-latest-stat-val.score-mid {
+    color: #f59e0b;
+}
+
+.dash-latest-stat-val.score-low {
+    color: #ef4444;
+}
+
+/* ─── Collapsible Sections ─── */
+.dash-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    padding: 4px 0;
+    user-select: none;
+}
+
+.dash-section-title {
+    margin: 0;
+    font-size: 0.9375rem;
+    font-weight: 600;
+}
+
+.dash-section-chevron {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    transition: transform 0.2s;
+}
+
+.dash-collapsible {
+    padding-top: 12px;
+}
+
+/* ─── Topic Cards ─── */
+.topic-card {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.topic-card:hover {
+    background: var(--bg-hover, rgba(255, 255, 255, 0.03));
+}
+
+.topic-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.topic-card-left {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    min-width: 0;
+    flex: 1;
+}
+
+.topic-card-left .topic-name {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.topic-frac {
+    font-size: 0.6875rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.topic-card-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.topic-pct-badge {
+    font-weight: 700;
+    font-size: 0.875rem;
+}
+
+.topic-chevron {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+}
+
+/* Mini Bar */
+.topic-bar-mini {
+    display: flex;
+    height: 4px;
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 8px;
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.topic-bar-seg {
+    height: 100%;
+    transition: width 0.3s;
+}
+
+.topic-bar-seg.mastery-green {
+    background: #22c55e;
+}
+
+.topic-bar-seg.mastery-yellow {
+    background: #f59e0b;
+}
+
+.topic-bar-seg.mastery-red {
+    background: #ef4444;
+}
+
+/* Topic Detail Grid */
+.topic-card-body {
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+}
+
+.topic-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+}
+
+.topic-detail-item {
+    text-align: center;
+    padding: 8px 4px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.topic-detail-item.green {
+    background: rgba(34, 197, 94, 0.08);
+}
+
+.topic-detail-item.yellow {
+    background: rgba(245, 158, 11, 0.08);
+}
+
+.topic-detail-item.red {
+    background: rgba(239, 68, 68, 0.08);
+}
+
+.topic-detail-item.gray {
+    background: rgba(107, 114, 128, 0.08);
+}
+
+.topic-detail-count {
+    display: block;
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.topic-detail-label {
+    display: block;
+    font-size: 0.625rem;
+    color: var(--text-secondary);
+    margin-top: 2px;
+}
+
+/* ─── Session Cards ─── */
+.session-card {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.session-card:hover {
+    background: var(--bg-hover, rgba(255, 255, 255, 0.03));
+}
+
+.session-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+}
+
+.session-card-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.session-card-id {
+    font-weight: 700;
+    font-size: 0.8125rem;
+    color: var(--accent);
+}
+
+.session-card-date {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.session-card-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.session-card-score {
+    font-weight: 600;
+    font-size: 0.8125rem;
+    color: var(--text-primary);
+}
+
+.session-card-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.session-card-expand {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    margin-left: auto;
+    transition: transform 0.2s;
+}
+
+.session-card-details {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+}
+
+/* ─── Dashboard Mobile Responsive ─── */
+@media (max-width: 480px) {
+    .dash-stats-row {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 6px;
+    }
+
+    .dash-stat-chip {
+        padding: 8px 4px;
+    }
+
+    .dash-chip-val {
+        font-size: 1rem;
+    }
+
+    .dash-chip-label {
+        font-size: 0.625rem;
+    }
+
+    .dash-hero-value {
+        font-size: 1.125rem;
+    }
+
+    .topic-detail-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .dash-latest-grid {
+        grid-template-columns: repeat(2, 1fr);
     }
 }

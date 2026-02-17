@@ -215,66 +215,81 @@
 
         <!-- Dashboard View -->
         <div id="dashboard" class="view">
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <span class="stat-value" id="dash-total">0</span>
-                    <span class="stat-label">Total Quizzes</span>
+            <!-- Hero: Overall Progress -->
+            <div class="dash-hero">
+                <div class="dash-hero-left">
+                    <div class="dash-hero-label">Overall Progress</div>
+                    <div class="dash-hero-value" id="dash-set-progress">Set 0 / 0</div>
                 </div>
-                <div class="stat-card">
-                    <span class="stat-value" id="dash-avg">0%</span>
-                    <span class="stat-label">Avg Score</span>
-                </div>
-                <div class="stat-card">
-                    <span class="stat-value" id="dash-streak-current">0</span>
-                    <span class="stat-label">Current Streak</span>
-                </div>
-                <div class="stat-card">
-                    <span class="stat-value" id="dash-streak-best">0</span>
-                    <span class="stat-label">Best Streak</span>
-                </div>
-                <div class="stat-card">
-                    <span class="stat-value" id="dash-best">—</span>
-                    <span class="stat-label">Best Session</span>
-                </div>
-                <div class="stat-card">
-                    <span class="stat-value" id="dash-worst">—</span>
-                    <span class="stat-label">Worst Session</span>
+                <div class="dash-hero-bar-wrap">
+                    <div class="dash-hero-bar" id="dash-set-bar" style="width:0%"></div>
                 </div>
             </div>
 
-            <div class="card">
-                <h3 class="section-title">Topic Mastery</h3>
-                <div id="topic-stats-container"></div>
-            </div>
-
-            <div class="card">
-                <h3 class="section-title">Session History</h3>
-                <div class="table-wrapper">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>#</th>
-                                <th>Date</th>
-                                <th>Questions</th>
-                                <th>Score</th>
-                                <th>%</th>
-                                <th>Mode</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody id="session-history-body">
-                            <tr>
-                                <td colspan="7" class="empty-msg">No sessions yet</td>
-                            </tr>
-                        </tbody>
-                    </table>
+            <!-- Compact Stats Row -->
+            <div class="dash-stats-row">
+                <div class="dash-stat-chip">
+                    <span class="dash-chip-val" id="dash-total">0</span>
+                    <span class="dash-chip-label">Quizzes</span>
+                </div>
+                <div class="dash-stat-chip">
+                    <span class="dash-chip-val" id="dash-avg">0%</span>
+                    <span class="dash-chip-label">Avg</span>
+                </div>
+                <div class="dash-stat-chip accent">
+                    <span class="dash-chip-val" id="dash-streak-current">0</span>
+                    <span class="dash-chip-label">Streak 🔥</span>
+                </div>
+                <div class="dash-stat-chip">
+                    <span class="dash-chip-val" id="dash-streak-best">0</span>
+                    <span class="dash-chip-label">Best</span>
+                </div>
+                <div class="dash-stat-chip good">
+                    <span class="dash-chip-val" id="dash-best">—</span>
+                    <span class="dash-chip-label">Best Session</span>
+                </div>
+                <div class="dash-stat-chip bad">
+                    <span class="dash-chip-val" id="dash-worst">—</span>
+                    <span class="dash-chip-label">Worst</span>
                 </div>
             </div>
 
+            <!-- Latest Session Summary -->
+            <div class="card dash-latest-card" id="dash-latest-session" style="display:none">
+                <h3 class="dash-section-title">📋 Latest Session</h3>
+                <div id="dash-latest-content"></div>
+            </div>
+
+            <!-- Topic Mastery (Collapsible) -->
             <div class="card">
-                <h3 class="section-title">Incorrect Answers Log</h3>
-                <div id="dash-incorrect-list">
-                    <p class="empty-msg">No incorrect answers recorded yet.</p>
+                <div class="dash-section-header" onclick="toggleDashSection('topic-mastery-body')">
+                    <h3 class="dash-section-title">📊 Topic Mastery</h3>
+                    <span class="dash-section-chevron" id="chevron-topic-mastery-body">▼</span>
+                </div>
+                <div id="topic-mastery-body" class="dash-collapsible" style="display:none">
+                    <div id="topic-stats-container"></div>
+                </div>
+            </div>
+
+            <!-- Session History (Collapsible) -->
+            <div class="card">
+                <div class="dash-section-header" onclick="toggleDashSection('session-history-wrap')">
+                    <h3 class="dash-section-title">📅 Session History</h3>
+                    <span class="dash-section-chevron" id="chevron-session-history-wrap">▼</span>
+                </div>
+                <div id="session-history-wrap" class="dash-collapsible" style="display:none">
+                    <div id="session-history-cards"></div>
+                </div>
+            </div>
+
+            <!-- Incorrect Log (Collapsible) -->
+            <div class="card">
+                <div class="dash-section-header" onclick="toggleDashSection('dash-incorrect-wrap')">
+                    <h3 class="dash-section-title">❌ Incorrect Answers</h3>
+                    <span class="dash-section-chevron" id="chevron-dash-incorrect-wrap">▼</span>
+                </div>
+                <div id="dash-incorrect-wrap" class="dash-collapsible" style="display:none">
+                    <div id="dash-incorrect-list"></div>
                 </div>
             </div>
 

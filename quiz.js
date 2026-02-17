@@ -1113,6 +1113,14 @@ function showDashboard() {
     const streaks = getStreaks();
     refreshHomeStats();
 
+    // Overall Progress: Sets completed vs total
+    const totalSets = Math.ceil(allQuestions.length / QUESTIONS_PER_SESSION);
+    const completedSets = progress.unlockedSetIndex || 0;
+    const setPct = totalSets > 0 ? Math.round((completedSets / totalSets) * 100) : 0;
+    document.getElementById('dash-set-progress').textContent = `Set ${completedSets} / ${totalSets}`;
+    document.getElementById('dash-set-bar').style.width = setPct + '%';
+
+    // Compact stats
     document.getElementById('dash-total').textContent = progress.totalQuizzes;
     document.getElementById('dash-avg').textContent = getAverageScore() + '%';
     document.getElementById('dash-streak-current').textContent = streaks.current;
@@ -1120,62 +1128,94 @@ function showDashboard() {
 
     const best = getBestSession();
     const worst = getWorstSession();
-    document.getElementById('dash-best').textContent = best ? `${best.score}/${best.total} (#${best.id})` : '—';
-    document.getElementById('dash-worst').textContent = worst ? `${worst.score}/${worst.total} (#${worst.id})` : '—';
+    document.getElementById('dash-best').textContent = best ? `${best.score}/${best.total}` : '—';
+    document.getElementById('dash-worst').textContent = worst ? `${worst.score}/${worst.total}` : '—';
 
+    // Latest Session Summary
+    const latestCard = document.getElementById('dash-latest-session');
+    const latestContent = document.getElementById('dash-latest-content');
+    if (progress.sessions.length > 0) {
+        const latest = progress.sessions[progress.sessions.length - 1];
+        const latestPct = Math.round((latest.score / latest.total) * 100);
+        const latestClass = getScoreClass(latest.score, latest.total);
+        // Calculate avg time if available
+        let avgTimeStr = '';
+        if (latest.results && latest.results.length > 0) {
+            const timesArr = latest.results.filter(r => r.timeTaken > 0).map(r => r.timeTaken);
+            if (timesArr.length > 0) {
+                const avgTime = timesArr.reduce((a, b) => a + b, 0) / timesArr.length;
+                avgTimeStr = `<div class="dash-latest-stat"><span class="dash-latest-stat-label">Avg Time</span><span class="dash-latest-stat-val">${avgTime.toFixed(1)}s</span></div>`;
+            }
+        }
+        latestContent.innerHTML = `
+            <div class="dash-latest-grid">
+                <div class="dash-latest-stat">
+                    <span class="dash-latest-stat-label">Score</span>
+                    <span class="dash-latest-stat-val ${latestClass}">${latest.score}/${latest.total}</span>
+                </div>
+                <div class="dash-latest-stat">
+                    <span class="dash-latest-stat-label">Accuracy</span>
+                    <span class="dash-latest-stat-val"><span class="score-badge ${latestClass}">${latestPct}%</span></span>
+                </div>
+                <div class="dash-latest-stat">
+                    <span class="dash-latest-stat-label">Questions</span>
+                    <span class="dash-latest-stat-val">Q${latest.startQ}–Q${latest.endQ}</span>
+                </div>
+                <div class="dash-latest-stat">
+                    <span class="dash-latest-stat-label">Mode</span>
+                    <span class="dash-latest-stat-val"><span class="mode-badge-sm">${latest.mode || 'normal'}</span></span>
+                </div>
+                ${avgTimeStr}
+            </div>
+        `;
+        latestCard.style.display = 'block';
+    } else {
+        latestCard.style.display = 'none';
+    }
+
+    // Topic Mastery
     renderTopicStats();
 
-    const tbody = document.getElementById('session-history-body');
+    // Session History Cards
+    const historyContainer = document.getElementById('session-history-cards');
     if (progress.sessions.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="empty-msg">No sessions yet</td></tr>';
+        historyContainer.innerHTML = '<p class="empty-msg">No sessions yet</p>';
     } else {
-        tbody.innerHTML = progress.sessions.slice().reverse().map(s => {
+        historyContainer.innerHTML = progress.sessions.slice().reverse().map(s => {
             const pct = Math.round((s.score / s.total) * 100);
             const scoreClass = getScoreClass(s.score, s.total);
-            // Check if we have detailed results
             const hasDetails = s.results && s.results.length > 0;
-            const toggleBtn = hasDetails
-                ? `<button class="btn-link" onclick="toggleSessionDetails(${s.id}, event)"><span id="icon-${s.id}" class="rotate-icon">▼</span></button>`
-                : '';
-
-            let detailsHtml = '';
-            if (hasDetails) {
-                detailsHtml = `
-                    <tr id="details-${s.id}" class="history-details-row">
-                        <td colspan="7">
-                            <div class="history-detail-content">
-                                ${renderAccordionReview(s.results, 'hist-' + s.id)}
-                            </div>
-                        </td>
-                    </tr>
-                `;
-            }
 
             return `
-                <tr class="history-row" onclick="toggleSessionDetails(${s.id})">
-                    <td>${s.id}</td>
-                    <td>${s.date}</td>
-                    <td>Q${s.startQ} – Q${s.endQ}</td>
-                    <td>${s.score} / ${s.total}</td>
-                    <td><span class="score-badge ${scoreClass}">${pct}%</span></td>
-                    <td><span class="mode-badge-sm">${s.mode || 'normal'}</span></td>
-                    <td>
+                <div class="session-card" onclick="toggleSessionCardDetails(this)">
+                    <div class="session-card-header">
+                        <div class="session-card-left">
+                            <span class="session-card-id">#${s.id}</span>
+                            <span class="session-card-date">${s.date}</span>
+                        </div>
+                        <div class="session-card-right">
+                            <span class="score-badge ${scoreClass}">${pct}%</span>
+                            <span class="session-card-score">${s.score}/${s.total}</span>
+                        </div>
+                    </div>
+                    <div class="session-card-meta">
+                        <span>Q${s.startQ}–Q${s.endQ}</span>
+                        <span class="mode-badge-sm">${s.mode || 'normal'}</span>
                         <button class="btn btn-secondary btn-sm" onclick="redoSet(${s.startQ - 1}); event.stopPropagation();">🔄</button>
-                        ${toggleBtn}
-                    </td>
-                </tr>
-                ${detailsHtml}
+                        ${hasDetails ? '<span class="session-card-expand">▼</span>' : ''}
+                    </div>
+                    ${hasDetails ? `<div class="session-card-details" style="display:none">${renderAccordionReview(s.results, 'hist-' + s.id)}</div>` : ''}
+                </div>
             `;
         }).join('');
     }
 
-    // ... (incorrect log display ...)
+    // Incorrect log
     const incorrectDiv = document.getElementById('dash-incorrect-list');
     if (progress.incorrectLog.length === 0) {
         incorrectDiv.innerHTML = '<p class="empty-msg">No incorrect answers recorded yet.</p>';
     } else {
         let html = '';
-        // Show last 20 incorrect answers
         const recent = progress.incorrectLog.slice().reverse().slice(0, 20);
         for (const item of recent) {
             html += `
@@ -1194,20 +1234,24 @@ function showDashboard() {
     showView('dashboard');
 }
 
-function toggleSessionDetails(sessionId, event) {
-    if (event) event.stopPropagation();
-    const row = document.getElementById(`details-${sessionId}`);
-    const parentRow = row.previousElementSibling;
-
-    if (row.classList.contains('active')) {
-        row.classList.remove('active');
-        parentRow.classList.remove('active');
-    } else {
-        row.classList.add('active');
-        parentRow.classList.add('active');
-    }
+// ─── Dashboard Section Toggle ───
+function toggleDashSection(sectionId) {
+    const section = document.getElementById(sectionId);
+    const chevron = document.getElementById('chevron-' + sectionId);
+    if (!section) return;
+    const isOpen = section.style.display !== 'none';
+    section.style.display = isOpen ? 'none' : 'block';
+    if (chevron) chevron.textContent = isOpen ? '▼' : '▲';
 }
 
+function toggleSessionCardDetails(cardEl) {
+    const details = cardEl.querySelector('.session-card-details');
+    const chevron = cardEl.querySelector('.session-card-expand');
+    if (!details) return;
+    const isOpen = details.style.display !== 'none';
+    details.style.display = isOpen ? 'none' : 'block';
+    if (chevron) chevron.textContent = isOpen ? '▼' : '▲';
+}
 
 function renderTopicStats() {
     const topicStats = getTopicStats(allQuestions);
@@ -1218,28 +1262,51 @@ function renderTopicStats() {
     const sorted = Object.entries(topicStats).sort((a, b) => b[1].total - a[1].total);
 
     for (const [topic, stats] of sorted) {
-        const accuracy = stats.attempted > 0 ? Math.round((stats.correct / (stats.correct + (stats.attempted - stats.mastered - stats.review))) * 100) : 0;
         const pct = stats.total > 0 ? Math.round((stats.mastered / stats.total) * 100) : 0;
+        const unseen = stats.total - stats.mastered - stats.review - stats.weak;
+        const greenW = stats.total > 0 ? (stats.mastered / stats.total) * 100 : 0;
+        const yellowW = stats.total > 0 ? (stats.review / stats.total) * 100 : 0;
+        const redW = stats.total > 0 ? (stats.weak / stats.total) * 100 : 0;
 
         html += `
-            <div class="topic-stat-row">
-                <div class="topic-stat-header">
-                    <span class="topic-name">${escapeHtml(topic)}</span>
-                    <span class="topic-pct">${pct}% mastered</span>
+            <div class="topic-card" onclick="toggleTopicCard(this)">
+                <div class="topic-card-header">
+                    <div class="topic-card-left">
+                        <span class="topic-name">${escapeHtml(topic)}</span>
+                        <span class="topic-frac">${stats.mastered}/${stats.total}</span>
+                    </div>
+                    <div class="topic-card-right">
+                        <span class="topic-pct-badge" style="color:${pct >= 70 ? '#22c55e' : pct >= 40 ? '#f59e0b' : '#ef4444'}">${pct}%</span>
+                        <span class="topic-chevron">▼</span>
+                    </div>
                 </div>
-                <div class="mastery-bar">
-                    <div class="mastery-bar-fill mastery-green" style="width:${(stats.mastered / stats.total) * 100}%"></div>
-                    <div class="mastery-bar-fill mastery-yellow" style="width:${(stats.review / stats.total) * 100}%"></div>
-                    <div class="mastery-bar-fill mastery-red" style="width:${(stats.weak / stats.total) * 100}%"></div>
+                <div class="topic-bar-mini">
+                    <div class="topic-bar-seg mastery-green" style="width:${greenW}%"></div>
+                    <div class="topic-bar-seg mastery-yellow" style="width:${yellowW}%"></div>
+                    <div class="topic-bar-seg mastery-red" style="width:${redW}%"></div>
                 </div>
-                <div class="topic-counts">
-                    <small>${stats.mastered}🟢 ${stats.review}🟡 ${stats.weak}🔴 ${stats.total - stats.mastered - stats.review - stats.weak} unseen</small>
+                <div class="topic-card-body" style="display:none">
+                    <div class="topic-detail-grid">
+                        <div class="topic-detail-item green"><span class="topic-detail-count">${stats.mastered}</span><span class="topic-detail-label">🟢 Mastered</span></div>
+                        <div class="topic-detail-item yellow"><span class="topic-detail-count">${stats.review}</span><span class="topic-detail-label">🟡 Review</span></div>
+                        <div class="topic-detail-item red"><span class="topic-detail-count">${stats.weak}</span><span class="topic-detail-label">🔴 Weak</span></div>
+                        <div class="topic-detail-item gray"><span class="topic-detail-count">${unseen}</span><span class="topic-detail-label">⬜ Unseen</span></div>
+                    </div>
                 </div>
             </div>
         `;
     }
 
     container.innerHTML = html || '<p class="empty-msg">No topic data yet.</p>';
+}
+
+function toggleTopicCard(cardEl) {
+    const body = cardEl.querySelector('.topic-card-body');
+    const chevron = cardEl.querySelector('.topic-chevron');
+    if (!body) return;
+    const isOpen = body.style.display !== 'none';
+    body.style.display = isOpen ? 'none' : 'block';
+    if (chevron) chevron.textContent = isOpen ? '▼' : '▲';
 }
 
 function getScoreClass(score, total) {
@@ -1400,25 +1467,6 @@ async function handlePostExplainInHistory(qId, sessionId) {
 
 }
 
-function toggleSessionDetails(sessionId, event) {
-    if (event) event.stopPropagation();
-    const row = document.getElementById(`details-${sessionId}`);
-    const parentRow = row.previousElementSibling;
-
-    if (row.classList.contains('active')) {
-        row.classList.remove('active');
-        parentRow.classList.remove('active');
-    } else {
-        row.classList.add('active');
-        parentRow.classList.add('active');
-    }
-
-    // Rotate icon (try different selectors to be safe)
-    const icon = document.getElementById(`icon-${sessionId}`) || parentRow.querySelector('.rotate-icon');
-    if (icon) {
-        icon.style.transform = row.classList.contains('active') ? 'rotate(180deg)' : 'rotate(0deg)';
-    }
-}
 
 // ─── Boot ───
 document.addEventListener('DOMContentLoaded', checkAuth);
