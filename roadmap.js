@@ -1,18 +1,23 @@
 /**
  * roadmap.js – Interactive Knowledge Map + DeepSeek Learning Roadmap
+ *             (per-user via Storage abstraction)
  */
 
 let roadmapData = null;
 
 async function loadRoadmap() {
-    const cached = localStorage.getItem('roadmapAnalysis');
+    const cached = Storage.get('roadmapAnalysis');
     if (cached) {
-        try { roadmapData = JSON.parse(cached); return roadmapData; } catch (e) { }
+        roadmapData = cached;
+        return roadmapData;
     }
     return null;
 }
 
 async function generateRoadmap(questions) {
+    if (!Subscription.isPro()) {
+        return { error: 'tier-locked', text: 'AI Roadmap Analysis is a Pro feature. Upgrade to unlock.' };
+    }
     const result = await aiAnalyzeQuestions(questions);
     if (result.error) return result;
     roadmapData = result;
@@ -20,7 +25,7 @@ async function generateRoadmap(questions) {
 }
 
 function clearRoadmapCache() {
-    localStorage.removeItem('roadmapAnalysis');
+    Storage.remove('roadmapAnalysis');
     roadmapData = null;
 }
 
@@ -56,7 +61,6 @@ function renderKnowledgeMap(container, questions) {
     let topicOrder;
     if (roadmapData && roadmapData.studyOrder) {
         topicOrder = [...roadmapData.studyOrder];
-        // Add any topics not in DeepSeek order
         for (const t of Object.keys(topicGroups)) {
             if (!topicOrder.includes(t)) topicOrder.push(t);
         }
@@ -73,6 +77,7 @@ function renderKnowledgeMap(container, questions) {
     // Overall summary
     const counts = getMasteryCounts(questions);
     const totalQ = questions.length;
+    const isPro = Subscription.isPro();
 
     let html = `
         <div class="km-header">
@@ -92,8 +97,9 @@ function renderKnowledgeMap(container, questions) {
         </div>
 
         <div class="km-actions">
-            <button class="btn btn-ai btn-sm" onclick="handleGenerateRoadmap();" id="btn-generate-roadmap">
-                🧠 ${roadmapData ? 'Regenerate AI Analysis' : 'Generate AI Analysis'}
+            <button class="btn btn-ai btn-sm ${!isPro ? 'btn-locked' : ''}" onclick="${isPro ? 'handleGenerateRoadmap();' : 'showUpgradePrompt();'}" id="btn-generate-roadmap">
+                ${isPro ? '🧠' : '🔒'} ${roadmapData ? 'Regenerate AI Analysis' : 'Generate AI Analysis'}
+                ${!isPro ? '<span class="pro-required">PRO</span>' : ''}
             </button>
             ${roadmapData ? '<button class="btn btn-secondary btn-sm" onclick="clearRoadmapCache(); showRoadmapView();">🗑 Clear AI Cache</button>' : ''}
         </div>
@@ -113,20 +119,15 @@ function renderKnowledgeMap(container, questions) {
         const unseenCount = total - masteredCount - reviewCount - weakCount;
         const masteryPct = total > 0 ? Math.round((masteredCount / total) * 100) : 0;
 
-        // Determine domain status
         let statusIcon, statusColor;
         if (masteryPct >= 70) { statusIcon = '🟢'; statusColor = '#22c55e'; }
         else if (masteryPct >= 30) { statusIcon = '🟡'; statusColor = '#f59e0b'; }
         else if (masteredCount + reviewCount + weakCount > 0) { statusIcon = '🔴'; statusColor = '#ef4444'; }
         else { statusIcon = '⚪'; statusColor = '#6b7280'; }
 
-        // Count tricky questions in this topic
         const trickyInTopic = qs.filter(q => trickMap[q.id]);
-
-        // Prerequisites
         const prereqs = prereqMap[topicName] || [];
 
-        // Difficulty from DeepSeek
         let diffLabel = '';
         if (roadmapData && roadmapData.topics) {
             const rdTopic = roadmapData.topics.find(t => t.name === topicName);
@@ -203,7 +204,6 @@ function renderKnowledgeMap(container, questions) {
             </div>
         `;
 
-        // Connector arrow between domains
         if (i < topicOrder.length - 1) {
             html += '<div class="roadmap-connector"><div class="connector-line"></div><div class="connector-arrow">▼</div></div>';
         }
@@ -230,6 +230,11 @@ function escapeAttr(str) {
 // ─────────────────────────────────────────────
 
 async function handleGenerateRoadmap() {
+    if (!Subscription.isPro()) {
+        showUpgradePrompt();
+        return;
+    }
+
     const btn = document.getElementById('btn-generate-roadmap');
     if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Analyzing all questions…'; }
 
@@ -247,7 +252,6 @@ async function handleGenerateRoadmap() {
         return;
     }
 
-    // Re-render with enriched data
     showRoadmapView();
 }
 

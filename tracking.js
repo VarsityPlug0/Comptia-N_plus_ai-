@@ -1,9 +1,7 @@
 /**
  * tracking.js – Per-question stats, mastery levels, topic categorization
+ *              (per-user via Storage abstraction)
  */
-
-const TRACKING_KEY = 'questionTracking';
-const STREAKS_KEY = 'quizStreaks';
 
 // ─── Topic Keywords ───
 const TOPIC_KEYWORDS = {
@@ -40,13 +38,12 @@ function classifyTopic(questionText) {
 
 // ─── Question Stats ───
 function getQuestionStats() {
-    const raw = localStorage.getItem(TRACKING_KEY);
-    if (!raw) return {};
-    try { return JSON.parse(raw); } catch (e) { return {}; }
+    const raw = Storage.get('questionTracking');
+    return raw || {};
 }
 
 function saveQuestionStats(stats) {
-    localStorage.setItem(TRACKING_KEY, JSON.stringify(stats));
+    Storage.set('questionTracking', stats);
 }
 
 function recordQuestionResult(questionId, isCorrect) {
@@ -121,26 +118,26 @@ function getQuestionsByMastery(questions, mastery) {
     return questions.filter(q => {
         const qs = stats[q.id];
         if (mastery === 'unseen') return !qs;
-        if (!qs) return mastery === 'weak'; // unseen counts as weak
+        if (!qs) return mastery === 'weak';
         return qs.mastery === mastery;
     });
 }
 
 // ─── Streaks ───
 function getStreaks() {
-    const raw = localStorage.getItem(STREAKS_KEY);
+    const raw = Storage.get('streaks');
     if (!raw) return { current: 0, best: 0, lastDate: null };
-    try { return JSON.parse(raw); } catch (e) { return { current: 0, best: 0, lastDate: null }; }
+    return raw;
 }
 
 function updateStreak(score, total) {
     const streaks = getStreaks();
     const today = new Date().toDateString();
-    const passed = (score / total) >= 0.7; // 70% threshold for streak
+    const passed = (score / total) >= 0.7;
 
     if (passed) {
         if (streaks.lastDate === today) {
-            // Already quizzed today, just keep current streak
+            // Already quizzed today
         } else {
             const yesterday = new Date(Date.now() - 86400000).toDateString();
             if (streaks.lastDate === yesterday || !streaks.lastDate) {
@@ -158,6 +155,6 @@ function updateStreak(score, total) {
         streaks.lastDate = today;
     }
 
-    localStorage.setItem(STREAKS_KEY, JSON.stringify(streaks));
+    Storage.set('streaks', streaks);
     return streaks;
 }

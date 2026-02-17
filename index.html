@@ -14,8 +14,13 @@
 
         <!-- Header -->
         <header class="app-header">
-            <h1>⚡ NetQuiz</h1>
-            <p class="subtitle">Smart Networking Study Coach</p>
+            <div class="header-top">
+                <div class="header-brand">
+                    <h1>⚡ NetQuiz</h1>
+                    <p class="subtitle">Smart Networking Study Coach</p>
+                </div>
+                <span class="header-user" id="header-user-info"></span>
+            </div>
             <nav class="header-nav">
                 <button class="nav-btn" onclick="goHome()" title="Home">🏠</button>
                 <button class="nav-btn" onclick="showDashboard()" title="Progress">📊</button>
@@ -30,8 +35,10 @@
             <div class="login-container">
                 <div class="login-logo">⚡</div>
                 <h2 class="login-title">NetQuiz</h2>
-                <p class="login-subtitle">Sign in to your study dashboard</p>
-                <div class="login-card card">
+                <p class="login-subtitle">Sign in or create an account to start studying</p>
+
+                <!-- Login Form -->
+                <div id="login-form" class="login-card card">
                     <div class="form-group">
                         <label for="login-username">Username</label>
                         <input type="text" id="login-username" class="form-input" placeholder="Enter username"
@@ -44,6 +51,32 @@
                     </div>
                     <p class="login-error" id="login-error" style="display:none"></p>
                     <button class="btn btn-primary btn-full" id="login-btn" onclick="handleLogin()">Sign In</button>
+                    <p class="auth-switch">Don't have an account? <a href="#"
+                            onclick="showRegisterForm(); return false;">Create one</a></p>
+                </div>
+
+                <!-- Registration Form -->
+                <div id="register-form" class="login-card card" style="display:none">
+                    <div class="form-group">
+                        <label for="reg-username">Username</label>
+                        <input type="text" id="reg-username" class="form-input" placeholder="Choose a username"
+                            autocomplete="username">
+                    </div>
+                    <div class="form-group">
+                        <label for="reg-password">Password</label>
+                        <input type="password" id="reg-password" class="form-input" placeholder="Choose a password"
+                            autocomplete="new-password">
+                    </div>
+                    <div class="form-group">
+                        <label for="reg-confirm">Confirm Password</label>
+                        <input type="password" id="reg-confirm" class="form-input" placeholder="Confirm password"
+                            autocomplete="new-password">
+                    </div>
+                    <p class="login-error" id="register-error" style="display:none"></p>
+                    <button class="btn btn-primary btn-full" id="register-btn" onclick="handleRegister()">Create
+                        Account</button>
+                    <p class="auth-switch">Already have an account? <a href="#"
+                            onclick="showLoginForm(); return false;">Sign in</a></p>
                 </div>
             </div>
         </div>
@@ -58,6 +91,9 @@
 
         <!-- Home View -->
         <div id="home" class="view">
+            <!-- Tier Usage Indicator -->
+            <div class="tier-usage" id="tier-usage-indicator"></div>
+
             <div class="stats-grid">
                 <div class="stat-card">
                     <span class="stat-value" id="stat-total-quizzes">0</span>
@@ -85,14 +121,23 @@
 
             <p class="start-info" id="start-info">Loading…</p>
 
+            <div class="level-section">
+                <h3 class="section-title">Campaign Mode</h3>
+                <div id="level-grid" class="level-grid"></div>
+            </div>
+
             <div class="home-actions">
-                <button class="btn btn-primary btn-full" onclick="startQuiz()">▶ Continue (Next 10)</button>
                 <button class="btn btn-secondary btn-full" onclick="showModeSelector()">🎯 Practice Modes</button>
                 <div class="btn-row">
                     <button class="btn btn-secondary" onclick="showDashboard()">📊 Progress</button>
                     <button class="btn btn-secondary" onclick="showRoadmapView()">🗺️ Roadmap</button>
                 </div>
             </div>
+
+            <!-- Upgrade Button (visible for free users) -->
+            <button class="btn btn-upgrade upgrade-btn-global" onclick="handleOneClickUpgrade()">
+                ⚡ Upgrade to Pro – Unlock Full Access
+            </button>
             <p id="total-available" style="display:none"></p>
         </div>
 
@@ -125,6 +170,11 @@
                 <button class="btn btn-primary" id="btn-results" onclick="showResults()" style="display:none">View
                     Results →</button>
             </div>
+
+            <!-- Upgrade Button in Quiz -->
+            <button class="btn btn-upgrade upgrade-btn-global" onclick="handleOneClickUpgrade()">
+                ⚡ Upgrade to Pro – Unlock Full Access
+            </button>
         </div>
 
         <!-- Results View -->
@@ -149,12 +199,18 @@
                     </div>
                 </div>
             </div>
+            <div id="results-usage-note" style="display:none"></div>
             <div class="card" id="results-incorrect"></div>
             <div class="results-actions">
                 <button class="btn btn-secondary" onclick="redoSet(sessionStartIndex)">🔄 Redo Set</button>
                 <button class="btn btn-primary" onclick="startQuiz()">▶ Next Session</button>
                 <button class="btn btn-secondary" onclick="goHome()">← Home</button>
             </div>
+
+            <!-- Upgrade Button in Results -->
+            <button class="btn btn-upgrade upgrade-btn-global" onclick="handleOneClickUpgrade()">
+                ⚡ Upgrade to Pro – Unlock Full Access
+            </button>
         </div>
 
         <!-- Dashboard View -->
@@ -233,6 +289,12 @@
             <div class="card">
                 <div id="roadmap-content"></div>
             </div>
+
+            <!-- Upgrade Button in Roadmap -->
+            <button class="btn btn-upgrade upgrade-btn-global" onclick="handleOneClickUpgrade()">
+                ⚡ Upgrade to Pro – Unlock Full Access
+            </button>
+
             <button class="btn btn-secondary btn-full" onclick="goHome()" style="margin-top:12px">← Home</button>
         </div>
 
@@ -241,46 +303,70 @@
             <div class="card">
                 <h2 class="section-title">Settings</h2>
 
-                <div class="form-group">
-                    <label>DeepSeek API Key</label>
-                    <input type="password" id="input-api-key" class="form-input" placeholder="sk-...">
-                </div>
-
-                <div class="form-group">
-                    <label>API Endpoint</label>
-                    <input type="text" id="input-api-endpoint" class="form-input"
-                        placeholder="https://api.deepseek.com/v1/chat/completions">
-                </div>
-
-                <div class="form-group">
-                    <label>Model</label>
-                    <input type="text" id="input-api-model" class="form-input" placeholder="deepseek-chat">
-                </div>
-
-                <div class="form-group">
-                    <label>AI Explanation Mode</label>
-                    <div class="radio-group">
-                        <label class="radio-label">
-                            <input type="radio" name="explainMode" value="beginner" id="mode-beginner"> Beginner
-                            (simple, analogy-based)
-                        </label>
-                        <label class="radio-label">
-                            <input type="radio" name="explainMode" value="technical" id="mode-technical"> Technical
-                            (cert-level detail)
-                        </label>
+                <!-- Subscription Tier -->
+                <div class="settings-section">
+                    <h3 class="settings-subtitle">Subscription</h3>
+                    <div id="settings-tier-display" class="tier-display"></div>
+                    <div class="form-group">
+                        <label>Pro Activation Key</label>
+                        <div class="pro-key-row">
+                            <input type="password" id="input-pro-key" class="form-input" placeholder="Enter Pro Key">
+                            <button class="btn btn-primary btn-sm" onclick="handleActivatePro()">Activate</button>
+                        </div>
+                        <p class="login-error" id="pro-key-error" style="display:none"></p>
                     </div>
                 </div>
 
                 <hr class="divider">
 
-                <div class="form-group">
-                    <label>Exam Simulation Duration (minutes)</label>
-                    <input type="number" id="input-exam-duration" class="form-input" value="90" min="10" max="240">
+                <!-- AI Settings -->
+                <div class="settings-section">
+                    <h3 class="settings-subtitle">AI Configuration</h3>
+                    <div class="form-group">
+                        <label>DeepSeek API Key</label>
+                        <input type="password" id="input-api-key" class="form-input" placeholder="sk-...">
+                    </div>
+
+                    <div class="form-group">
+                        <label>API Endpoint</label>
+                        <input type="text" id="input-api-endpoint" class="form-input"
+                            placeholder="https://api.deepseek.com/v1/chat/completions">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Model</label>
+                        <input type="text" id="input-api-model" class="form-input" placeholder="deepseek-chat">
+                    </div>
+
+                    <div class="form-group">
+                        <label>AI Explanation Mode</label>
+                        <div class="radio-group">
+                            <label class="radio-label">
+                                <input type="radio" name="explainMode" value="beginner" id="mode-beginner"> Beginner
+                                (simple, analogy-based)
+                            </label>
+                            <label class="radio-label">
+                                <input type="radio" name="explainMode" value="technical" id="mode-technical"> Technical
+                                (cert-level detail)
+                            </label>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="form-group">
-                    <label>Exam Question Count</label>
-                    <input type="number" id="input-exam-count" class="form-input" value="60" min="10" max="200">
+                <hr class="divider">
+
+                <!-- Exam Settings -->
+                <div class="settings-section">
+                    <h3 class="settings-subtitle">Exam Simulation</h3>
+                    <div class="form-group">
+                        <label>Exam Duration (minutes)</label>
+                        <input type="number" id="input-exam-duration" class="form-input" value="90" min="10" max="240">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Exam Question Count</label>
+                        <input type="number" id="input-exam-count" class="form-input" value="60" min="10" max="200">
+                    </div>
                 </div>
 
                 <div class="btn-row" style="margin-top:20px">
@@ -290,9 +376,229 @@
             </div>
         </div>
 
+        <!-- Checkout Modal (multi-step) -->
+        <div id="checkout-modal" class="modal-overlay" style="display:none">
+            <div class="checkout-card">
+
+                <!-- Step 1: Plan Selection -->
+                <div id="checkout-step-plans" class="checkout-step">
+                    <button class="checkout-close" onclick="closeCheckout()" title="Close">&times;</button>
+                    <div class="checkout-header">
+                        <span class="modal-icon">⚡</span>
+                        <h2>Choose Your Plan</h2>
+                        <p id="checkout-usage-text" class="checkout-subtitle">Unlock unlimited access to everything</p>
+                    </div>
+
+                    <div class="checkout-steps-indicator">
+                        <span class="step-dot active"></span>
+                        <span class="step-line"></span>
+                        <span class="step-dot"></span>
+                        <span class="step-line"></span>
+                        <span class="step-dot"></span>
+                    </div>
+
+                    <div class="plan-cards">
+                        <div class="plan-card" onclick="selectPlan('monthly')" id="plan-monthly">
+                            <div class="plan-name">Monthly</div>
+                            <div class="plan-price">R99<span>/mo</span></div>
+                            <ul class="plan-perks">
+                                <li>✅ Unlimited questions</li>
+                                <li>✅ All practice modes</li>
+                                <li>✅ Live AI explanations</li>
+                                <li>✅ Exam simulation</li>
+                            </ul>
+                            <div class="plan-tag">Flexible</div>
+                        </div>
+
+                        <div class="plan-card popular" onclick="selectPlan('annual')" id="plan-annual">
+                            <div class="plan-badge-popular">Most Popular</div>
+                            <div class="plan-name">Annual</div>
+                            <div class="plan-price">R699<span>/yr</span></div>
+                            <div class="plan-savings">Save 41% — R58/mo</div>
+                            <ul class="plan-perks">
+                                <li>✅ Everything in Monthly</li>
+                                <li>✅ Priority support</li>
+                                <li>✅ AI roadmap analysis</li>
+                            </ul>
+                            <div class="plan-tag">Best Value</div>
+                        </div>
+
+                        <div class="plan-card" onclick="selectPlan('lifetime')" id="plan-lifetime">
+                            <div class="plan-name">Lifetime</div>
+                            <div class="plan-price">R1,499<span> once</span></div>
+                            <div class="plan-savings">Pay once, access forever</div>
+                            <ul class="plan-perks">
+                                <li>✅ Everything in Annual</li>
+                                <li>✅ Future updates free</li>
+                                <li>✅ Lifetime access</li>
+                            </ul>
+                            <div class="plan-tag">Forever</div>
+                        </div>
+                    </div>
+
+                    <div class="checkout-footer">
+                        <button class="btn btn-secondary" onclick="closeCheckout()">Maybe Later</button>
+                    </div>
+                </div>
+
+                <!-- Step 2: Payment Form -->
+                <div id="checkout-step-payment" class="checkout-step" style="display:none">
+                    <button class="checkout-close" onclick="closeCheckout()" title="Close">&times;</button>
+                    <div class="checkout-header">
+                        <h2>Payment Details</h2>
+                        <p class="checkout-subtitle">
+                            <span id="payment-plan-label">Annual Plan</span> — <strong
+                                id="payment-plan-price">R699/yr</strong>
+                        </p>
+                    </div>
+
+                    <div class="checkout-steps-indicator">
+                        <span class="step-dot completed">✓</span>
+                        <span class="step-line active"></span>
+                        <span class="step-dot active"></span>
+                        <span class="step-line"></span>
+                        <span class="step-dot"></span>
+                    </div>
+
+                    <form id="payment-form" onsubmit="return handlePayment(event)">
+                        <div class="payment-field">
+                            <label for="pay-name">Cardholder Name</label>
+                            <input type="text" id="pay-name" class="form-input" placeholder="Name on card" required
+                                autocomplete="cc-name">
+                        </div>
+
+                        <div class="payment-field">
+                            <label for="pay-card">Card Number</label>
+                            <div class="card-input-wrap">
+                                <input type="text" id="pay-card" class="form-input" placeholder="1234 5678 9012 3456"
+                                    maxlength="19" required autocomplete="cc-number" inputmode="numeric">
+                                <span class="card-brand" id="card-brand-icon">💳</span>
+                            </div>
+                        </div>
+
+                        <div class="payment-row">
+                            <div class="payment-field">
+                                <label for="pay-expiry">Expiry</label>
+                                <input type="text" id="pay-expiry" class="form-input" placeholder="MM/YY" maxlength="5"
+                                    required autocomplete="cc-exp" inputmode="numeric">
+                            </div>
+                            <div class="payment-field">
+                                <label for="pay-cvv">CVV</label>
+                                <input type="text" id="pay-cvv" class="form-input" placeholder="123" maxlength="4"
+                                    required autocomplete="cc-csc" inputmode="numeric">
+                            </div>
+                        </div>
+
+                        <div class="payment-field">
+                            <label for="pay-email">Email (for receipt)</label>
+                            <input type="email" id="pay-email" class="form-input" placeholder="you@example.com" required
+                                autocomplete="email">
+                        </div>
+
+                        <div id="payment-error" class="payment-error" style="display:none"></div>
+
+                        <div class="payment-secure">
+                            🔒 Secured with 256-bit SSL encryption
+                        </div>
+
+                        <div class="checkout-footer">
+                            <button type="button" class="btn btn-secondary" onclick="showCheckoutStep('plans')">←
+                                Back</button>
+                            <button type="submit" class="btn btn-primary btn-upgrade-modal" id="pay-submit-btn">
+                                💳 Pay <span id="pay-btn-amount">R699</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Step 3: Processing -->
+                <div id="checkout-step-processing" class="checkout-step" style="display:none">
+                    <div class="checkout-header">
+                        <div class="processing-spinner"></div>
+                        <h2>Processing Payment</h2>
+                        <p class="checkout-subtitle" id="processing-status">Verifying your card details…</p>
+                    </div>
+
+                    <div class="checkout-steps-indicator">
+                        <span class="step-dot completed">✓</span>
+                        <span class="step-line completed"></span>
+                        <span class="step-dot completed">✓</span>
+                        <span class="step-line active"></span>
+                        <span class="step-dot active"></span>
+                    </div>
+
+                    <div class="processing-stages">
+                        <div class="processing-stage" id="proc-verify">
+                            <span class="proc-icon">⏳</span> Verifying card details…
+                        </div>
+                        <div class="processing-stage" id="proc-charge">
+                            <span class="proc-icon">⏳</span> Processing payment…
+                        </div>
+                        <div class="processing-stage" id="proc-activate">
+                            <span class="proc-icon">⏳</span> Activating Pro features…
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 4: Success -->
+                <div id="checkout-step-success" class="checkout-step" style="display:none">
+                    <div class="checkout-header">
+                        <span class="modal-icon success-icon">🎉</span>
+                        <h2>Welcome to Pro!</h2>
+                        <p class="checkout-subtitle">Your upgrade is complete</p>
+                    </div>
+
+                    <div class="checkout-steps-indicator">
+                        <span class="step-dot completed">✓</span>
+                        <span class="step-line completed"></span>
+                        <span class="step-dot completed">✓</span>
+                        <span class="step-line completed"></span>
+                        <span class="step-dot completed">✓</span>
+                    </div>
+
+                    <div class="success-details">
+                        <div class="success-plan" id="success-plan-name">Annual Plan — R699/yr</div>
+                        <div class="success-receipt">
+                            <p>Receipt sent to <strong id="success-email">your email</strong></p>
+                            <p class="success-ref">Ref: <span id="success-ref-id">NQ-000000</span></p>
+                        </div>
+                        <ul class="success-unlocked">
+                            <li>🔓 Unlimited questions</li>
+                            <li>🔓 All practice modes</li>
+                            <li>🔓 Live AI explanations</li>
+                            <li>🔓 Exam simulation mode</li>
+                            <li>🔓 AI roadmap analysis</li>
+                        </ul>
+                    </div>
+
+                    <div class="checkout-footer">
+                        <button class="btn btn-primary btn-upgrade-modal" onclick="closeCheckoutSuccess()">🚀 Start
+                            Learning</button>
+                    </div>
+                </div>
+
+                <!-- Step 4b: Failure -->
+                <div id="checkout-step-failed" class="checkout-step" style="display:none">
+                    <div class="checkout-header">
+                        <span class="modal-icon">❌</span>
+                        <h2>Payment Failed</h2>
+                        <p class="checkout-subtitle" id="failure-reason">Your card was declined. Please try again.</p>
+                    </div>
+
+                    <div class="checkout-footer">
+                        <button class="btn btn-primary" onclick="showCheckoutStep('payment')">🔄 Try Again</button>
+                        <button class="btn btn-secondary" onclick="closeCheckout()">Cancel</button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
     </div>
 
     <!-- Scripts (order matters: dependencies first) -->
+    <script src="storage.js"></script>
+    <script src="subscription.js"></script>
     <script src="config.js"></script>
     <script src="tracking.js"></script>
     <script src="parser.js"></script>

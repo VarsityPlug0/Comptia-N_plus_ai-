@@ -1,15 +1,15 @@
 /**
- * auth.js – Client-side authentication (credentials stored as SHA-256 hashes only)
+ * auth.js – Multi-user authentication with registration
+ * 
+ * Users are stored in a global registry (localStorage).
+ * Each user has a SHA-256 hashed username and password.
+ * Sessions are stored per-user with 7-day expiry.
  */
 
-// Pre-computed SHA-256 hashes – no plaintext credentials in source
-const VALID_USER_HASH = 'da6e1484e704bfd56dd16271a38e2323143b78148b058709bad45661a77af552';
-const VALID_PASS_HASH = 'c150ae8a4184deb79af5cb2a8fd975a92524c4a83b4c9df9bf4fce27b09e12c3';
-
-const SESSION_KEY = 'netquiz_session';
+const USERS_REGISTRY_KEY = 'users';
 const SESSION_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 days
 
-// SHA-256 hash using Web Crypto API
+// ─── SHA-256 Hashing ───
 async function sha256(text) {
     const encoder = new TextEncoder();
     const data = encoder.encode(text);
@@ -18,56 +18,135 @@ async function sha256(text) {
     return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-// Check if user is logged in
+// ─── User Registry ───
+function getUserRegistry() {
+    return Storage.global.get(USERS_REGISTRY_KEY) || [];
+}
+
+function saveUserRegistry(registry) {
+    Storage.global.set(USERS_REGISTRY_KEY, registry);
+}
+
+// ─── Registration ───
+async function registerUser(username, password) {
+    const trimmed = username.trim();
+    if (!trimmed || !password) {
+        return { success: false, error: 'Username and password are required.' };
+    }
+    if (trimmed.length < 3) {
+        return { success: false, error: 'Username must be at least 3 characters.' };
+    }
+    if (password.length < 4) {
+        return { success: false, error: 'Password must be at least 4 characters.' };
+    }
+
+    const userId = trimmed.toLowerCase();
+    const registry = getUserRegistry();
+
+    // Check for duplicate username
+    if (registry.some(u => u.userId === userId)) {
+        return { success: false, error: 'Username already taken. Choose another.' };
+    }
+
+    const passHash = await sha256(password);
+
+    registry.push({
+        userId: userId,
+        displayName: trimmed,
+        passwordHash: passHash,
+        createdAt: new Date().toISOString()
+    });
+
+    saveUserRegistry(registry);
+    return { success: true, userId: userId };
+}
+
+// ─── Authentication ───
+async function authenticate(username, password) {
+    const userId = username.trim().toLowerCase();
+    const registry = getUserRegistry();
+    const user = registry.find(u => u.userId === userId);
+
+    if (!user) {
+        return { success: false, error: 'Invalid username or password.' };
+    }
+
+    const passHash = await sha256(password);
+    if (passHash !== user.passwordHash) {
+        return { success: false, error: 'Invalid username or password.' };
+    }
+
+    // Set up session
+    Storage.setCurrentUser(userId);
+    Storage.set('session', {
+        userId: userId,
+        displayName: user.displayName,
+        timestamp: Date.now()
+    });
+
+    return { success: true, displayName: user.displayName };
+}
+
+// ─── Session Management ───
 function isLoggedIn() {
-    const session = localStorage.getItem(SESSION_KEY);
-    if (!session) return false;
-    try {
-        const data = JSON.parse(session);
-        if (Date.now() - data.timestamp > SESSION_DURATION) {
-            localStorage.removeItem(SESSION_KEY);
-            return false;
-        }
-        return true;
-    } catch (e) {
+    const userId = Storage.getCurrentUser();
+    if (!userId) return false;
+
+    const session = Storage.get('session');
+    if (!session) {
+        Storage.clearCurrentUser();
         return false;
     }
+
+    if (Date.now() - session.timestamp > SESSION_DURATION) {
+        Storage.remove('session');
+        Storage.clearCurrentUser();
+        return false;
+    }
+
+    return true;
 }
 
 function getLoggedInUser() {
-    const session = localStorage.getItem(SESSION_KEY);
-    if (!session) return null;
-    try {
-        return JSON.parse(session).username;
-    } catch (e) {
-        return null;
-    }
+    const session = Storage.get('session');
+    return session ? session.displayName : null;
 }
 
-// Authenticate user – compares input hashes against stored hashes
-async function authenticate(username, password) {
-    const uHash = await sha256(username);
-    const pHash = await sha256(password);
-
-    if (uHash === VALID_USER_HASH && pHash === VALID_PASS_HASH) {
-        const session = {
-            username: username,
-            timestamp: Date.now()
-        };
-        localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-        return { success: true };
-    }
-    return { success: false, error: 'Invalid username or password' };
+function getLoggedInUserId() {
+    return Storage.getCurrentUser();
 }
 
-// Logout
+// ─── Logout ───
 function logout() {
-    localStorage.removeItem(SESSION_KEY);
+    Storage.remove('session');
+    Storage.clearCurrentUser();
     showView('login');
     document.querySelector('.app-header').style.display = 'none';
+    showLoginForm();
 }
 
-// Handle login form
+// ─── UI Handlers ───
+function showLoginForm() {
+    document.getElementById('login-form').style.display = 'block';
+    document.getElementById('register-form').style.display = 'none';
+    document.getElementById('login-error').style.display = 'none';
+    document.getElementById('register-error').style.display = 'none';
+    // Clear fields
+    document.getElementById('login-username').value = '';
+    document.getElementById('login-password').value = '';
+}
+
+function showRegisterForm() {
+    document.getElementById('login-form').style.display = 'none';
+    document.getElementById('register-form').style.display = 'block';
+    document.getElementById('login-error').style.display = 'none';
+    document.getElementById('register-error').style.display = 'none';
+    // Clear fields
+    document.getElementById('reg-username').value = '';
+    document.getElementById('reg-password').value = '';
+    document.getElementById('reg-confirm').value = '';
+}
+
 async function handleLogin() {
     const username = document.getElementById('login-username').value.trim();
     const password = document.getElementById('login-password').value;
@@ -88,6 +167,7 @@ async function handleLogin() {
 
     if (result.success) {
         document.querySelector('.app-header').style.display = '';
+        updateHeaderUser();
         initApp();
     } else {
         errorEl.textContent = result.error;
@@ -97,20 +177,81 @@ async function handleLogin() {
     }
 }
 
-// Boot check – called before initApp
+async function handleRegister() {
+    const username = document.getElementById('reg-username').value.trim();
+    const password = document.getElementById('reg-password').value;
+    const confirm = document.getElementById('reg-confirm').value;
+    const errorEl = document.getElementById('register-error');
+
+    if (!username || !password || !confirm) {
+        errorEl.textContent = 'Please fill in all fields.';
+        errorEl.style.display = 'block';
+        return;
+    }
+
+    if (password !== confirm) {
+        errorEl.textContent = 'Passwords do not match.';
+        errorEl.style.display = 'block';
+        return;
+    }
+
+    const btn = document.getElementById('register-btn');
+    btn.disabled = true;
+    btn.textContent = 'Creating account…';
+    errorEl.style.display = 'none';
+
+    const result = await registerUser(username, password);
+
+    if (result.success) {
+        // Auto-login after registration
+        const loginResult = await authenticate(username, password);
+        if (loginResult.success) {
+            document.querySelector('.app-header').style.display = '';
+            updateHeaderUser();
+            initApp();
+        }
+    } else {
+        errorEl.textContent = result.error;
+        errorEl.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = 'Create Account';
+    }
+}
+
+function updateHeaderUser() {
+    const displayName = getLoggedInUser();
+    const tier = Subscription.getTier();
+    const userEl = document.getElementById('header-user-info');
+    if (userEl && displayName) {
+        const tierBadge = tier === 'pro'
+            ? '<span class="tier-badge tier-pro">⚡ PRO</span>'
+            : '<span class="tier-badge tier-free">FREE</span>';
+        userEl.innerHTML = `${escapeHtml(displayName)} ${tierBadge}`;
+    }
+}
+
+// ─── Boot Check ───
 function checkAuth() {
     if (isLoggedIn()) {
         document.querySelector('.app-header').style.display = '';
+        updateHeaderUser();
         initApp();
     } else {
         document.querySelector('.app-header').style.display = 'none';
         showView('login');
-        // Enter key support
+        showLoginForm();
+
+        // Enter key support for login
         document.getElementById('login-password').addEventListener('keydown', function (e) {
             if (e.key === 'Enter') handleLogin();
         });
         document.getElementById('login-username').addEventListener('keydown', function (e) {
             if (e.key === 'Enter') document.getElementById('login-password').focus();
+        });
+
+        // Enter key support for registration
+        document.getElementById('reg-confirm').addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') handleRegister();
         });
     }
 }

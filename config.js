@@ -1,30 +1,24 @@
 /**
- * config.js – Settings management and API key storage
+ * config.js – Settings management (per-user via Storage abstraction)
  */
 
-const CONFIG_KEY = 'quizAppConfig';
-
 const DEFAULT_CONFIG = {
-    apiKey: '',  // User sets this in Settings → stored in localStorage only
+    apiKey: '',
     apiEndpoint: 'https://api.deepseek.com/v1/chat/completions',
     apiModel: 'deepseek-chat',
-    explanationMode: 'beginner', // 'beginner' or 'technical'
-    examDuration: 90,            // minutes
+    explanationMode: 'beginner',
+    examDuration: 90,
     examQuestionCount: 60
 };
 
 function getConfig() {
-    const raw = localStorage.getItem(CONFIG_KEY);
+    const raw = Storage.get('config');
     if (!raw) return { ...DEFAULT_CONFIG };
-    try {
-        return { ...DEFAULT_CONFIG, ...JSON.parse(raw) };
-    } catch (e) {
-        return { ...DEFAULT_CONFIG };
-    }
+    return { ...DEFAULT_CONFIG, ...raw };
 }
 
 function saveConfig(config) {
-    localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
+    Storage.set('config', config);
 }
 
 function hasApiKey() {

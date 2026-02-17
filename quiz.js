@@ -1,5 +1,5 @@
 /**
- * quiz.js – Core quiz engine v2: modes, AI, reinforcement, exam timer
+ * quiz.js – Core quiz engine v3: multi-user, tiers, modes, AI, exam timer
  */
 
 let allQuestions = [];
@@ -12,6 +12,10 @@ let isRedoSession = false;
 let currentMode = 'normal';
 let examTimer = null;
 let examTimeLeft = 0;
+// ... (previous variables)
+let currentSetIndex = 0; // Tracks which set (level) is currently being played
+let questionStartTime = 0; // Tracks when the current question was displayed
+let questionTimes = {}; // Stores time taken (in seconds) for each question index
 const QUESTIONS_PER_SESSION = 10;
 
 // ─── Initialization ───
@@ -68,11 +72,313 @@ function refreshHomeStats() {
         `;
     }
 
+    // Free tier usage indicator
+    const usageEl = document.getElementById('tier-usage-indicator');
+    if (usageEl) {
+        if (Subscription.isPro()) {
+            usageEl.innerHTML = '<span class="tier-badge tier-pro">⚡ PRO</span> Unlimited access';
+            usageEl.className = 'tier-usage pro';
+        } else {
+            const remaining = Subscription.getRemainingQuestions();
+            const usage = Subscription.getUsage();
+            const pct = Math.round((usage.questionsThisMonth / usage.limit) * 100);
+            usageEl.innerHTML = `
+                <span class="tier-badge tier-free">FREE</span>
+                <span class="usage-text">${remaining} of ${usage.limit} questions remaining this month</span>
+                <div class="usage-bar">
+                    <div class="usage-bar-fill ${pct >= 80 ? 'usage-critical' : pct >= 50 ? 'usage-warning' : ''}" style="width:${pct}%"></div>
+                </div>
+            `;
+            usageEl.className = 'tier-usage free';
+        }
+    }
+
     const nextStart = progress.nextStartIndex;
     document.getElementById('start-info').textContent =
         nextStart >= allQuestions.length
             ? 'You\'ve completed all questions! Starting over from Question 1.'
             : `Next session starts at Question ${nextStart + 1}`;
+
+    // Update header tier badge
+    if (typeof updateHeaderUser === 'function') updateHeaderUser();
+
+    // Show/hide upgrade buttons based on tier
+    updateUpgradeButtons();
+
+    // Render Level Grid
+    if (typeof renderLevelGrid === 'function') renderLevelGrid();
+}
+
+// ═══════════════════════════════════════════════════
+// CHECKOUT FLOW
+// ═══════════════════════════════════════════════════
+
+const PLANS = {
+    monthly: { name: 'Monthly Plan', price: 'R99', period: '/mo', amount: 99 },
+    annual: { name: 'Annual Plan', price: 'R699', period: '/yr', amount: 699 },
+    lifetime: { name: 'Lifetime Plan', price: 'R1,499', period: ' once', amount: 1499 }
+};
+
+let _selectedPlan = 'annual'; // default
+
+/** Open checkout modal (called by all upgrade buttons) */
+function handleOneClickUpgrade() {
+    openCheckout();
+}
+
+function openCheckout() {
+    _selectedPlan = 'annual';
+    const modal = document.getElementById('checkout-modal');
+    if (!modal) return;
+    // Show plan step, hide others
+    showCheckoutStep('plans');
+    // Set usage text if available
+    const usageText = document.getElementById('checkout-usage-text');
+    if (usageText && !Subscription.isPro()) {
+        const usage = Subscription.getUsage();
+        usageText.textContent = `You've used ${usage.questionsThisMonth} of ${usage.limit} free questions. Unlock unlimited access!`;
+    }
+    // Highlight annual by default
+    selectPlanCard('annual');
+    modal.style.display = 'flex';
+}
+
+function closeCheckout() {
+    const modal = document.getElementById('checkout-modal');
+    if (modal) modal.style.display = 'none';
+    // Reset form
+    const form = document.getElementById('payment-form');
+    if (form) form.reset();
+    const errDiv = document.getElementById('payment-error');
+    if (errDiv) errDiv.style.display = 'none';
+}
+
+function closeCheckoutSuccess() {
+    closeCheckout();
+    // Refresh entire UI for Pro
+    if (typeof updateHeaderUser === 'function') updateHeaderUser();
+    refreshHomeStats();
+    updateUpgradeButtons();
+}
+
+/** Show a specific checkout step, hiding others */
+function showCheckoutStep(step) {
+    const steps = ['plans', 'payment', 'processing', 'success', 'failed'];
+    steps.forEach(s => {
+        const el = document.getElementById(`checkout-step-${s}`);
+        if (el) el.style.display = (s === step) ? 'block' : 'none';
+    });
+}
+
+/** Select a plan card */
+function selectPlan(planKey) {
+    _selectedPlan = planKey;
+    selectPlanCard(planKey);
+    // Transition to payment
+    const plan = PLANS[planKey];
+    document.getElementById('payment-plan-label').textContent = plan.name;
+    document.getElementById('payment-plan-price').textContent = plan.price + plan.period;
+    document.getElementById('pay-btn-amount').textContent = plan.price;
+    showCheckoutStep('payment');
+}
+
+function selectPlanCard(planKey) {
+    document.querySelectorAll('.plan-card').forEach(card => card.classList.remove('selected'));
+    const card = document.getElementById(`plan-${planKey}`);
+    if (card) card.classList.add('selected');
+}
+
+// ─── Card Input Formatting ───
+document.addEventListener('DOMContentLoaded', () => {
+    // Card number: add spaces every 4 digits
+    const cardInput = document.getElementById('pay-card');
+    if (cardInput) {
+        cardInput.addEventListener('input', (e) => {
+            let v = e.target.value.replace(/\D/g, '').substring(0, 16);
+            e.target.value = v.replace(/(.{4})/g, '$1 ').trim();
+            // Detect card brand
+            const brand = document.getElementById('card-brand-icon');
+            if (brand) {
+                if (v.startsWith('4')) brand.textContent = '💳 Visa';
+                else if (v.startsWith('5')) brand.textContent = '💳 MC';
+                else if (v.startsWith('3')) brand.textContent = '💳 Amex';
+                else brand.textContent = '💳';
+            }
+        });
+    }
+
+    // Expiry: auto-add slash
+    const expiryInput = document.getElementById('pay-expiry');
+    if (expiryInput) {
+        expiryInput.addEventListener('input', (e) => {
+            let v = e.target.value.replace(/\D/g, '').substring(0, 4);
+            if (v.length >= 2) v = v.substring(0, 2) + '/' + v.substring(2);
+            e.target.value = v;
+        });
+    }
+
+    // CVV: digits only
+    const cvvInput = document.getElementById('pay-cvv');
+    if (cvvInput) {
+        cvvInput.addEventListener('input', (e) => {
+            e.target.value = e.target.value.replace(/\D/g, '').substring(0, 4);
+        });
+    }
+});
+
+// ─── Payment Handling ───
+function handlePayment(event) {
+    event.preventDefault();
+
+    const errDiv = document.getElementById('payment-error');
+    errDiv.style.display = 'none';
+
+    // Validate fields
+    const name = document.getElementById('pay-name').value.trim();
+    const card = document.getElementById('pay-card').value.replace(/\s/g, '');
+    const expiry = document.getElementById('pay-expiry').value.trim();
+    const cvv = document.getElementById('pay-cvv').value.trim();
+    const email = document.getElementById('pay-email').value.trim();
+
+    if (name.length < 2) {
+        showPaymentError('Please enter the cardholder name.');
+        return false;
+    }
+    if (card.length < 13 || card.length > 19) {
+        showPaymentError('Please enter a valid card number.');
+        return false;
+    }
+    if (!/^\d{2}\/\d{2}$/.test(expiry)) {
+        showPaymentError('Please enter a valid expiry date (MM/YY).');
+        return false;
+    }
+    // Check expiry is not in the past
+    const [mm, yy] = expiry.split('/').map(Number);
+    const expDate = new Date(2000 + yy, mm);
+    if (expDate < new Date()) {
+        showPaymentError('This card has expired. Please use a valid card.');
+        return false;
+    }
+    if (cvv.length < 3) {
+        showPaymentError('Please enter a valid CVV.');
+        return false;
+    }
+    if (!email.includes('@')) {
+        showPaymentError('Please enter a valid email address.');
+        return false;
+    }
+
+    // Disable submit button
+    const submitBtn = document.getElementById('pay-submit-btn');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Processing…';
+
+    // Start processing
+    processPayment(email);
+    return false;
+}
+
+function showPaymentError(msg) {
+    const errDiv = document.getElementById('payment-error');
+    errDiv.textContent = msg;
+    errDiv.style.display = 'block';
+}
+
+async function processPayment(email) {
+    showCheckoutStep('processing');
+
+    const stages = [
+        { id: 'proc-verify', text: 'Verifying card details…', delay: 1200 },
+        { id: 'proc-charge', text: 'Processing payment…', delay: 1800 },
+        { id: 'proc-activate', text: 'Activating Pro features…', delay: 1000 }
+    ];
+
+    for (let i = 0; i < stages.length; i++) {
+        const stage = stages[i];
+        const el = document.getElementById(stage.id);
+
+        // Set current stage as active
+        el.classList.add('active');
+        el.querySelector('.proc-icon').textContent = '⏳';
+        document.getElementById('processing-status').textContent = stage.text;
+
+        await new Promise(r => setTimeout(r, stage.delay));
+
+        // Mark as done
+        el.classList.remove('active');
+        el.classList.add('done');
+        el.querySelector('.proc-icon').textContent = '✅';
+    }
+
+    // Simulate: 95% success rate (card number ending in 0000 = failure for testing)
+    const card = document.getElementById('pay-card').value.replace(/\s/g, '');
+    const simulateFailure = card.endsWith('0000');
+
+    if (simulateFailure) {
+        // Reset stages for next attempt
+        resetProcessingStages();
+        document.getElementById('failure-reason').textContent =
+            'Your card was declined. Please check your details and try again.';
+        showCheckoutStep('failed');
+        // Re-enable submit
+        const submitBtn = document.getElementById('pay-submit-btn');
+        submitBtn.disabled = false;
+        submitBtn.textContent = `💳 Pay ${PLANS[_selectedPlan].price}`;
+        return;
+    }
+
+    // SUCCESS — Activate Pro
+    Subscription.upgradeNow();
+
+    // Generate reference ID
+    const refId = 'NQ-' + Date.now().toString(36).toUpperCase();
+    const plan = PLANS[_selectedPlan];
+
+    // Store receipt
+    Storage.set('proReceipt', {
+        plan: _selectedPlan,
+        planName: plan.name,
+        amount: plan.price + plan.period,
+        email: email,
+        refId: refId,
+        date: new Date().toISOString()
+    });
+
+    // Show success
+    document.getElementById('success-plan-name').textContent = `${plan.name} — ${plan.price}${plan.period}`;
+    document.getElementById('success-email').textContent = email;
+    document.getElementById('success-ref-id').textContent = refId;
+
+    // Reset stages for potential future use
+    resetProcessingStages();
+
+    showCheckoutStep('success');
+
+    // Re-enable submit for potential future use
+    const submitBtn = document.getElementById('pay-submit-btn');
+    submitBtn.disabled = false;
+    submitBtn.textContent = `💳 Pay ${plan.price}`;
+}
+
+function resetProcessingStages() {
+    ['proc-verify', 'proc-charge', 'proc-activate'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.classList.remove('active', 'done');
+            el.querySelector('.proc-icon').textContent = '⏳';
+        }
+    });
+}
+
+// Legacy compatibility aliases
+function showUpgradePrompt() { openCheckout(); }
+function closeUpgradeModal() { closeCheckout(); }
+
+/** Show or hide all upgrade buttons based on current tier */
+function updateUpgradeButtons() {
+    document.querySelectorAll('.upgrade-btn-global').forEach(btn => {
+        btn.style.display = Subscription.isPro() ? 'none' : 'flex';
+    });
 }
 
 // ─── Practice Mode Selection ───
@@ -90,12 +396,16 @@ function showModeSelector() {
         const disabled = (key === 'mastered' && counts.mastered === 0) ||
             (key === 'review' && counts.review === 0);
 
+        const isLocked = !Subscription.isModeAllowed(key);
+
         html += `
-            <button class="mode-card ${disabled ? 'mode-disabled' : ''}" onclick="${disabled ? '' : `startModeQuiz('${key}')`}"
-                ${disabled ? 'disabled' : ''}>
-                <span class="mode-icon">${mode.icon}</span>
+            <button class="mode-card ${disabled || isLocked ? 'mode-disabled' : ''} ${isLocked ? 'mode-locked' : ''}"
+                onclick="${disabled || isLocked ? (isLocked ? 'showUpgradePrompt()' : '') : `startModeQuiz('${key}')`}"
+                ${disabled && !isLocked ? 'disabled' : ''}>
+                <span class="mode-icon">${isLocked ? '🔒' : mode.icon}</span>
                 <div class="mode-info">
                     <strong>${mode.label}</strong> ${count}
+                    ${isLocked ? '<span class="pro-required">PRO</span>' : ''}
                     <p>${mode.description}</p>
                 </div>
             </button>
@@ -124,10 +434,23 @@ function startQuiz() {
         currentSession = allQuestions.slice(0, QUESTIONS_PER_SESSION);
     }
 
+    // Check tier limit
+    const check = Subscription.canStartQuiz(currentSession.length);
+    if (!check.allowed) {
+        showUpgradePrompt();
+        return;
+    }
+
     beginSession();
 }
 
 function startModeQuiz(mode) {
+    // Check mode access
+    if (!Subscription.isModeAllowed(mode)) {
+        showUpgradePrompt();
+        return;
+    }
+
     currentMode = mode;
     isRedoSession = false;
 
@@ -141,6 +464,13 @@ function startModeQuiz(mode) {
         return;
     }
 
+    // Check tier limit
+    const check = Subscription.canStartQuiz(questions.length);
+    if (!check.allowed) {
+        showUpgradePrompt();
+        return;
+    }
+
     currentSession = questions;
     sessionStartIndex = 0;
 
@@ -151,12 +481,51 @@ function startModeQuiz(mode) {
     }
 }
 
+// ... (startModeQuiz logic above)
+
+function startSet(setIndex) {
+    const progress = getProgress();
+    if (setIndex > progress.unlockedSetIndex) {
+        alert("Level Locked! Complete previous levels first.");
+        return;
+    }
+    currentMode = 'level';
+    currentSetIndex = setIndex;
+    isRedoSession = false;
+    sessionStartIndex = setIndex * QUESTIONS_PER_SESSION;
+
+    if (sessionStartIndex >= allQuestions.length) {
+        alert("No questions in this set.");
+        return;
+    }
+
+    currentSession = allQuestions.slice(sessionStartIndex, sessionStartIndex + QUESTIONS_PER_SESSION);
+
+    // Check tier limit
+    const check = Subscription.canStartQuiz(currentSession.length);
+    if (!check.allowed) {
+        showUpgradePrompt();
+        return;
+    }
+
+    beginSession();
+}
+
 function redoSet(startIdx) {
+    // ...
     currentMode = 'normal';
     isRedoSession = true;
     sessionStartIndex = startIdx;
     currentSession = allQuestions.slice(sessionStartIndex, sessionStartIndex + QUESTIONS_PER_SESSION);
     if (currentSession.length === 0) return;
+
+    // Check tier limit
+    const check = Subscription.canStartQuiz(currentSession.length);
+    if (!check.allowed) {
+        showUpgradePrompt();
+        return;
+    }
+
     beginSession();
 }
 
@@ -176,6 +545,14 @@ function startTopicQuiz(topic, filter) {
     if (pool.length === 0) { alert('No questions available for this filter.'); return; }
     currentSession = pool.slice(0, QUESTIONS_PER_SESSION);
     sessionStartIndex = 0;
+
+    // Check tier limit
+    const check = Subscription.canStartQuiz(currentSession.length);
+    if (!check.allowed) {
+        showUpgradePrompt();
+        return;
+    }
+
     beginSession();
 }
 
@@ -186,12 +563,21 @@ function startSingleQuestion(questionId) {
     isRedoSession = false;
     currentSession = [q];
     sessionStartIndex = 0;
+
+    // Check tier limit
+    const check = Subscription.canStartQuiz(1);
+    if (!check.allowed) {
+        showUpgradePrompt();
+        return;
+    }
+
     beginSession();
 }
 
 function beginSession() {
     currentQuestionIndex = 0;
     userAnswers = {};
+    questionTimes = {};
     sessionSubmitted = false;
     document.getElementById('exam-timer-bar').style.display = 'none';
     renderQuestion();
@@ -201,6 +587,7 @@ function beginSession() {
 function beginExamSession() {
     currentQuestionIndex = 0;
     userAnswers = {};
+    questionTimes = {};
     sessionSubmitted = false;
 
     const config = getConfig();
@@ -245,7 +632,6 @@ function renderQuestion() {
         ? `<span class="multi-hint">Select all that apply (${q.correctAnswers.length} answers)</span>`
         : '';
 
-    // Topic badge
     const topicBadge = q.topic ? `<span class="topic-badge">${escapeHtml(q.topic)}</span>` : '';
 
     let html = `
@@ -315,6 +701,7 @@ function renderQuestion() {
 
     container.innerHTML = html;
     updateNavButtons();
+    questionStartTime = Date.now(); // Start timer for this question
 }
 
 // ─── AI Handlers ───
@@ -322,7 +709,7 @@ async function handlePreExplain(idx) {
     const q = currentSession[idx];
     const responseDiv = document.getElementById(`ai-pre-response-${idx}`);
     responseDiv.style.display = 'block';
-    responseDiv.innerHTML = '<span class="ai-loading">🔄 Thinking...</span>';
+    responseDiv.innerHTML = '<div class="ai-thinking"><span class="ai-thinking-dots"><span></span><span></span><span></span></span> Thinking…</div>';
 
     const config = getConfig();
     const modeToggle = `<div class="mode-toggle" style="margin-bottom:8px">
@@ -330,7 +717,7 @@ async function handlePreExplain(idx) {
         <button class="btn-link ${config.explanationMode === 'technical' ? 'active-mode' : ''}" onclick="setExplainMode('technical', ${idx}, 'pre')">Technical</button></small>
     </div>`;
 
-    const result = await aiExplainQuestion(q.text, q.options);
+    const result = await aiExplainQuestion(q.text, q.options, q.explanation, q.correctAnswers);
     responseDiv.innerHTML = modeToggle + `<div class="ai-text">${formatAiText(result.text)}</div>`;
 }
 
@@ -338,7 +725,7 @@ async function handlePostExplain(idx) {
     const q = currentSession[idx];
     const responseDiv = document.getElementById(`ai-post-response-${idx}`);
     responseDiv.style.display = 'block';
-    responseDiv.innerHTML = '<span class="ai-loading">🔄 Simplifying...</span>';
+    responseDiv.innerHTML = '<div class="ai-thinking"><span class="ai-thinking-dots"><span></span><span></span><span></span></span> Analyzing…</div>';
 
     const config = getConfig();
     const modeToggle = `<div class="mode-toggle" style="margin-bottom:8px">
@@ -354,15 +741,21 @@ function setExplainMode(mode, idx, type) {
     const config = getConfig();
     config.explanationMode = mode;
     saveConfig(config);
-    // Clear cache for this question and re-explain
-    const cacheKey = (type === 'pre' ? 'pre-' : 'post-') + currentSession[idx].text.substring(0, 80);
-    delete explanationCache[cacheKey];
+    // Clear session cache for this question and re-explain
+    const q = currentSession[idx];
+    const cacheKey = (type === 'pre' ? 'pre-' : 'post-') + config.explanationMode + '-' + q.text.substring(0, 80);
+    delete _sessionCache[cacheKey];
     if (type === 'pre') handlePreExplain(idx);
     else handlePostExplain(idx);
 }
 
 function formatAiText(text) {
-    return escapeHtml(text).replace(/\n/g, '<br>');
+    let formatted = escapeHtml(text);
+    // Convert **bold** to <strong>
+    formatted = formatted.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    // Convert newlines to <br>
+    formatted = formatted.replace(/\n/g, '<br>');
+    return formatted;
 }
 
 // ─── Option Selection ───
@@ -383,8 +776,22 @@ function selectOption(letter) {
 }
 
 // ─── Navigation ───
-function prevQuestion() { if (currentQuestionIndex > 0) { currentQuestionIndex--; renderQuestion(); } }
-function nextQuestion() { if (currentQuestionIndex < currentSession.length - 1) { currentQuestionIndex++; renderQuestion(); } }
+function prevQuestion() {
+    recordTime();
+    if (currentQuestionIndex > 0) { currentQuestionIndex--; renderQuestion(); }
+}
+function nextQuestion() {
+    recordTime();
+    if (currentQuestionIndex < currentSession.length - 1) { currentQuestionIndex++; renderQuestion(); }
+}
+
+function recordTime() {
+    if (!questionStartTime) return;
+    const elapsed = (Date.now() - questionStartTime) / 1000;
+    if (!questionTimes[currentQuestionIndex]) questionTimes[currentQuestionIndex] = 0;
+    questionTimes[currentQuestionIndex] += elapsed;
+    questionStartTime = 0; // Reset
+}
 
 function updateNavButtons() {
     document.getElementById('btn-prev').disabled = currentQuestionIndex === 0;
@@ -405,6 +812,7 @@ function updateNavButtons() {
 // ─── Submit Quiz ───
 function submitQuiz() {
     if (sessionSubmitted) return;
+    recordTime(); // Record time for the last question
     if (examTimer) { clearInterval(examTimer); examTimer = null; }
 
     const allAnswered = currentSession.every((_, i) => userAnswers[i] && userAnswers[i].length > 0);
@@ -424,8 +832,13 @@ function submitQuiz() {
         const selected = (userAnswers[i] || []).sort();
         const correct = [...q.correctAnswers].sort();
         const isCorrect = arraysEqual(selected, correct);
+        const userAnswer = selected.join(', ') || 'No answer';
 
-        resultsList.push({ questionId: q.id, isCorrect });
+        resultsList.push({
+            questionId: q.id,
+            isCorrect,
+            userAnswer: userAnswer
+        });
 
         if (isCorrect) {
             score++;
@@ -433,35 +846,73 @@ function submitQuiz() {
             incorrectList.push({
                 questionId: q.id,
                 questionText: q.text,
-                userAnswer: (userAnswers[i] || []).join(', ') || 'No answer',
+                userAnswer: userAnswer,
                 correctAnswer: q.correctAnswers.join(', ')
             });
         }
     }
 
+    // Record usage for free tier tracking
+    Subscription.recordUsage(currentSession.length);
+
     recordSession({
         startIndex: sessionStartIndex,
         endIndex: sessionStartIndex + currentSession.length,
-        score, total: currentSession.length,
-        incorrect: incorrectList,
+        score,
+        total: currentSession.length,
         results: resultsList,
+        incorrect: incorrectList,
+        mode: currentMode,
         isRedo: isRedoSession,
-        isCustomMode: currentMode !== 'normal',
-        mode: currentMode
+        setIndex: currentSetIndex
     });
 
-    renderQuestion();
-    prepareResults(score, currentSession.length, incorrectList);
+    // Level Progression Logic
+    let levelUnlocked = false;
+    if (currentMode === 'level' && !isRedoSession) {
+        const pct = (score / currentSession.length) * 100;
+        if (pct >= 70) { // Pass threshold
+            const progress = getProgress();
+            if (currentSetIndex === progress.unlockedSetIndex) {
+                progress.unlockedSetIndex++;
+                saveProgress(progress);
+                levelUnlocked = true;
+            }
+        }
+    }
+
+    showResults(score, currentSession.length, incorrectList, levelUnlocked);
 }
 
 // ─── Results Screen ───
-function prepareResults(score, total, incorrectList) {
+function showResults(score, total, incorrectList, levelUnlocked) {
+    prepareResults(score, total, incorrectList, levelUnlocked);
+    showView('results');
+}
+
+function prepareResults(score, total, incorrectList, levelUnlocked) {
     const pct = Math.round((score / total) * 100);
     document.getElementById('results-score').textContent = `${score} / ${total}`;
     document.getElementById('results-pct').textContent = `${pct}%`;
     document.getElementById('results-mode-badge').textContent =
-        PRACTICE_MODES[currentMode] ? PRACTICE_MODES[currentMode].label : 'Normal';
+        currentMode === 'level' ? `Level ${currentSetIndex + 1}` :
+            (PRACTICE_MODES[currentMode] ? PRACTICE_MODES[currentMode].label : 'Normal');
 
+    // Show Level Up Message
+    const resultsContainer = document.querySelector('#results .card');
+    // Remove old unlock message if exists
+    const existingMsg = document.getElementById('level-unlock-msg');
+    if (existingMsg) existingMsg.remove();
+
+    if (levelUnlocked) {
+        const msg = document.createElement('div');
+        msg.id = 'level-unlock-msg';
+        msg.className = 'level-unlock-banner';
+        msg.innerHTML = `<h3>🎉 Level Unlocked!</h3><p>You've passed Level ${currentSetIndex + 1}. Level ${currentSetIndex + 2} is now available.</p>`;
+        resultsContainer.prepend(msg);
+    }
+
+    // ... (rest of prepareResults logic)
     const ring = document.getElementById('score-ring-progress');
     const circumference = 2 * Math.PI * 54;
     ring.style.strokeDasharray = circumference;
@@ -472,9 +923,27 @@ function prepareResults(score, total, incorrectList) {
     else if (pct >= 60) color = '#f59e0b';
     ring.style.stroke = color;
 
+    // ... streaks ...
     const streaks = getStreaks();
     document.getElementById('results-streak').textContent = `${streaks.current}🔥`;
 
+    // ... usage ...
+    const usageNote = document.getElementById('results-usage-note');
+    if (usageNote) {
+        if (!Subscription.isPro()) {
+            const remaining = Subscription.getRemainingQuestions();
+            if (remaining <= 0) {
+                usageNote.innerHTML = '<span class="usage-exhausted">⚠️ Free tier limit reached. <a href="#" onclick="showUpgradePrompt(); return false;">Upgrade to Pro</a> for unlimited access.</span>';
+            } else {
+                usageNote.innerHTML = `<span class="usage-note">${remaining} free questions remaining this month</span>`;
+            }
+            usageNote.style.display = 'block';
+        } else {
+            usageNote.style.display = 'none';
+        }
+    }
+
+    // ... incorrect list ...
     const incorrectContainer = document.getElementById('results-incorrect');
     if (incorrectList.length === 0) {
         incorrectContainer.innerHTML = '<p class="perfect-score">🎉 Perfect Score! Great job!</p>';
@@ -515,34 +984,104 @@ function showDashboard() {
     document.getElementById('dash-best').textContent = best ? `${best.score}/${best.total} (#${best.id})` : '—';
     document.getElementById('dash-worst').textContent = worst ? `${worst.score}/${worst.total} (#${worst.id})` : '—';
 
-    // Topic accuracy
     renderTopicStats();
 
-    // Session history table
     const tbody = document.getElementById('session-history-body');
     if (progress.sessions.length === 0) {
         tbody.innerHTML = '<tr><td colspan="7" class="empty-msg">No sessions yet</td></tr>';
     } else {
-        tbody.innerHTML = progress.sessions.slice().reverse().map(s => `
-            <tr>
-                <td>${s.id}</td>
-                <td>${s.date}</td>
-                <td>Q${s.startQ} – Q${s.endQ}</td>
-                <td>${s.score} / ${s.total}</td>
-                <td><span class="score-badge ${getScoreClass(s.score, s.total)}">${Math.round((s.score / s.total) * 100)}%</span></td>
-                <td><span class="mode-badge-sm">${s.mode || 'normal'}</span></td>
-                <td><button class="btn btn-secondary btn-sm" onclick="redoSet(${s.startQ - 1})">🔄</button></td>
-            </tr>
-        `).join('');
+        tbody.innerHTML = progress.sessions.slice().reverse().map(s => {
+            const pct = Math.round((s.score / s.total) * 100);
+            const scoreClass = getScoreClass(s.score, s.total);
+            // Check if we have detailed results
+            const hasDetails = s.results && s.results.length > 0;
+            const toggleBtn = hasDetails
+                ? `<button class="btn-link" onclick="toggleSessionDetails(${s.id}, event)"><span id="icon-${s.id}" class="rotate-icon">▼</span></button>`
+                : '';
+
+            let detailsHtml = '';
+            if (hasDetails) {
+                detailsHtml = `
+                    <tr id="details-${s.id}" class="history-details-row">
+                        <td colspan="7">
+                            <div class="history-detail-content">
+                                <h4>Session ${s.id} Details</h4>
+                                ${s.results.map((r, idx) => {
+                    const q = allQuestions.find(q => q.id === r.questionId);
+                    if (!q) return '';
+
+                    // Find user answer from incorrectLog if wrong, or infer if correct
+                    // Actually, we didn't store user answer in 'results', only in 'incorrectLog'
+                    // But wait, recordSession passes 'resultsList' which has {questionId, isCorrect}
+                    // We need to look up the answer in incorrectLog if incorrect.
+                    // For correct answers, we don't strictly have the user's input stored in 'results' unless we change recordSession.
+                    // Update: I updated progress.js to store 'results', but that array only had {questionId, isCorrect}.
+                    // I should have stored {questionId, isCorrect, userAnswer} in resultsList in quiz.js.
+                    // Let's assume for now we just show Correct/Incorrect status.
+
+                    // Wait, I can't easily show "Selected Answer" if it was correct (unless I infer it was the correct answer).
+                    // If incorrect, I can find it index progress.incorrectLog (but that's global log, not per session).
+                    // The session object has 'incorrectLog' (wait, no, progress has it).
+                    // Actually sessionData passed to recordSession had 'incorrect'.
+                    // But we didn't store the full 'incorrect' list IN the session object in progress.js, only appended to global log.
+                    // Fix: I need to update recordSession in progress.js to store 'incorrect' list in the session object too if I want per-session details.
+
+                    return `
+                                        <div class="detail-item">
+                                            <div class="detail-header">
+                                                <span>Q${idx + 1} (ID: ${q.id})</span>
+                                                <span class="detail-status ${r.isCorrect ? 'correct' : 'incorrect'}">
+                                                    ${r.isCorrect ? 'Correct' : 'Incorrect'}
+                                                </span>
+                                            </div>
+                                            <div class="detail-q">${escapeHtml(q.text)}</div>
+                                            <div class="detail-a">
+                                                <span class="${r.isCorrect ? 'correct-answer' : 'your-answer'}">
+                                                    You: ${r.userAnswer || 'N/A'}
+                                                </span>
+                                                ${!r.isCorrect ? `<span class="correct-answer">Correct: ${q.correctAnswers.join(', ')}</span>` : ''}
+                                                <span class="detail-time" style="float:right; opacity:0.7; font-size:0.8em">⏱ ${r.timeTaken ? r.timeTaken.toFixed(1) + 's' : '-'}</span>
+                                            </div>
+                                            <div style="margin-top:8px">
+                                                <button class="btn btn-ai btn-sm" onclick="handlePostExplainInHistory(${r.questionId}, '${s.id}')">💡 Explain</button>
+                                            </div>
+                                            <div id="ai-hist-${s.id}-${r.questionId}" style="display:none; margin-top:8px" class="ai-response"></div>
+                                        </div>
+                                    `;
+                }).join('')}
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }
+
+            return `
+                <tr class="history-row" onclick="toggleSessionDetails(${s.id})">
+                    <td>${s.id}</td>
+                    <td>${s.date}</td>
+                    <td>Q${s.startQ} – Q${s.endQ}</td>
+                    <td>${s.score} / ${s.total}</td>
+                    <td><span class="score-badge ${scoreClass}">${pct}%</span></td>
+                    <td><span class="mode-badge-sm">${s.mode || 'normal'}</span></td>
+                    <td>
+                        <button class="btn btn-secondary btn-sm" onclick="redoSet(${s.startQ - 1}); event.stopPropagation();">🔄</button>
+                        ${toggleBtn}
+                    </td>
+                </tr>
+                ${detailsHtml}
+            `;
+        }).join('');
     }
 
-    // Incorrect log
+    // ... (incorrect log display ...)
     const incorrectDiv = document.getElementById('dash-incorrect-list');
     if (progress.incorrectLog.length === 0) {
         incorrectDiv.innerHTML = '<p class="empty-msg">No incorrect answers recorded yet.</p>';
     } else {
         let html = '';
-        for (const item of progress.incorrectLog) {
+        // Show last 20 incorrect answers
+        const recent = progress.incorrectLog.slice().reverse().slice(0, 20);
+        for (const item of recent) {
             html += `
                 <div class="review-item">
                     <div class="review-q"><strong>Q${item.questionId}:</strong> ${escapeHtml(item.questionText)}</div>
@@ -558,6 +1097,21 @@ function showDashboard() {
 
     showView('dashboard');
 }
+
+function toggleSessionDetails(sessionId, event) {
+    if (event) event.stopPropagation();
+    const row = document.getElementById(`details-${sessionId}`);
+    const parentRow = row.previousElementSibling;
+
+    if (row.classList.contains('active')) {
+        row.classList.remove('active');
+        parentRow.classList.remove('active');
+    } else {
+        row.classList.add('active');
+        parentRow.classList.add('active');
+    }
+}
+
 
 function renderTopicStats() {
     const topicStats = getTopicStats(allQuestions);
@@ -608,6 +1162,20 @@ function showSettings() {
     document.getElementById('input-exam-duration').value = config.examDuration || 90;
     document.getElementById('input-exam-count').value = config.examQuestionCount || 60;
     document.getElementById(`mode-${config.explanationMode}`).checked = true;
+
+    // Show current tier and Pro Key field
+    const tierDisplay = document.getElementById('settings-tier-display');
+    if (tierDisplay) {
+        if (Subscription.isPro()) {
+            tierDisplay.innerHTML = '<span class="tier-badge tier-pro">⚡ PRO</span> Full access enabled';
+        } else {
+            tierDisplay.innerHTML = '<span class="tier-badge tier-free">FREE</span> Limited access';
+        }
+    }
+
+    const proKeyInput = document.getElementById('input-pro-key');
+    if (proKeyInput) proKeyInput.value = '';
+
     showView('settings');
 }
 
@@ -622,6 +1190,33 @@ function saveSettings() {
     };
     saveConfig(config);
     goHome();
+}
+
+async function handleActivatePro() {
+    const proKeyInput = document.getElementById('input-pro-key');
+    const proKeyError = document.getElementById('pro-key-error');
+
+    if (!proKeyInput || !proKeyInput.value.trim()) {
+        if (proKeyError) {
+            proKeyError.textContent = 'Please enter a Pro Key.';
+            proKeyError.style.display = 'block';
+        }
+        return;
+    }
+
+    const result = await Subscription.activatePro(proKeyInput.value);
+    if (result.success) {
+        proKeyInput.value = '';
+        if (proKeyError) proKeyError.style.display = 'none';
+        showSettings(); // Re-render to show Pro badge
+        if (typeof updateHeaderUser === 'function') updateHeaderUser();
+        alert('🎉 Pro activated! You now have unlimited access.');
+    } else {
+        if (proKeyError) {
+            proKeyError.textContent = result.error;
+            proKeyError.style.display = 'block';
+        }
+    }
 }
 
 
@@ -644,6 +1239,68 @@ function arraysEqual(a, b) {
     if (a.length !== b.length) return false;
     for (let i = 0; i < a.length; i++) { if (a[i] !== b[i]) return false; }
     return true;
+}
+
+// ... (previous code)
+
+function renderLevelGrid() {
+    const container = document.getElementById('level-grid');
+    if (!container) return;
+
+    const progress = getProgress();
+    const totalSets = Math.ceil(allQuestions.length / QUESTIONS_PER_SESSION);
+    let html = '';
+
+    for (let i = 0; i < totalSets; i++) {
+        let statusClass = '';
+        let statusIcon = '';
+        let onClick = `startSet(${i})`;
+        let title = `Level ${i + 1}`;
+
+        if (i < progress.unlockedSetIndex) {
+            statusClass = 'completed';
+            statusIcon = '✅';
+            title += ' (Completed)';
+        } else if (i === progress.unlockedSetIndex) {
+            statusClass = 'current';
+            statusIcon = '▶';
+            title += ' (Current)';
+        } else {
+            statusClass = 'locked';
+            statusIcon = '🔒';
+            onClick = '';
+            title += ' (Locked)';
+        }
+
+        html += `
+            <div class="level-card ${statusClass}" onclick="${onClick}" title="${title}">
+                <span class="level-number">${i + 1}</span>
+                <span class="level-status">${statusIcon}</span>
+            </div>
+        `;
+    }
+    container.innerHTML = html;
+}
+
+// ... (previous code)
+
+async function handlePostExplainInHistory(qId, sessionId) {
+    const q = allQuestions.find(i => i.id === qId);
+    if (!q) return;
+
+    const responseDiv = document.getElementById(`ai-hist-${sessionId}-${qId}`);
+    responseDiv.style.display = 'block';
+
+    if (responseDiv.innerHTML.trim() !== '') {
+        // Already loaded, just toggle
+        // responseDiv.style.display = responseDiv.style.display === 'none' ? 'block' : 'none'; 
+        return;
+    }
+
+    responseDiv.innerHTML = '<div class="ai-thinking"><span class="ai-thinking-dots"><span></span><span></span><span></span></span> Analyzing...</div>';
+
+    const result = await aiExplainAnswer(q.text, q.correctAnswers.join(', '), q.explanation);
+    responseDiv.innerHTML = `<div class="ai-text">${formatAiText(result.text)}</div>`;
 }
 
 // ─── Boot ───

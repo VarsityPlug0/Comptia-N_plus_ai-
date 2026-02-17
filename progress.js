@@ -1,21 +1,25 @@
 /**
- * progress.js – Local storage progress tracking with streaks
+ * progress.js – Per-user progress tracking with streaks (via Storage abstraction)
  */
 
-const STORAGE_KEY = 'quizProgress';
-
 function getProgress() {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = Storage.get('progress');
     if (!raw) return createDefaultProgress();
-    try { return JSON.parse(raw); } catch (e) { return createDefaultProgress(); }
+    return raw;
 }
 
 function createDefaultProgress() {
-    return { totalQuizzes: 0, nextStartIndex: 0, sessions: [], incorrectLog: [] };
+    return {
+        totalQuizzes: 0,
+        nextStartIndex: 0, // Legacy support, can be repurposed or ignored
+        unlockedSetIndex: 0, // New: Tracks the highest unlocked set (0-indexed)
+        sessions: [],
+        incorrectLog: []
+    };
 }
 
 function saveProgress(progress) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
+    Storage.set('progress', progress);
 }
 
 function recordSession(sessionData) {
@@ -32,7 +36,8 @@ function recordSession(sessionData) {
         endQ: sessionData.endIndex,
         score: sessionData.score,
         total: sessionData.total,
-        mode: sessionData.mode || 'normal'
+        mode: sessionData.mode || 'normal',
+        results: sessionData.results || [] // Store full question details
     });
 
     for (const wrong of sessionData.incorrect) {
@@ -78,8 +83,8 @@ function getWorstSession() {
 }
 
 function resetProgress() {
-    localStorage.removeItem(STORAGE_KEY);
-    localStorage.removeItem('questionTracking');
-    localStorage.removeItem('quizStreaks');
-    localStorage.removeItem('roadmapAnalysis');
+    Storage.remove('progress');
+    Storage.remove('questionTracking');
+    Storage.remove('streaks');
+    Storage.remove('roadmapAnalysis');
 }
