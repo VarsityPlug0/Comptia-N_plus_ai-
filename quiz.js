@@ -1397,6 +1397,27 @@ async function handlePostExplainInHistory(qId, sessionId) {
 
     const result = await aiExplainAnswer(q.text, q.correctAnswers.join(', '), q.explanation);
     responseDiv.innerHTML = `<div class="ai-text">${formatAiText(result.text)}</div>`;
+
+}
+
+function toggleSessionDetails(sessionId, event) {
+    if (event) event.stopPropagation();
+    const row = document.getElementById(`details-${sessionId}`);
+    const parentRow = row.previousElementSibling;
+
+    if (row.classList.contains('active')) {
+        row.classList.remove('active');
+        parentRow.classList.remove('active');
+    } else {
+        row.classList.add('active');
+        parentRow.classList.add('active');
+    }
+
+    // Rotate icon (try different selectors to be safe)
+    const icon = document.getElementById(`icon-${sessionId}`) || parentRow.querySelector('.rotate-icon');
+    if (icon) {
+        icon.style.transform = row.classList.contains('active') ? 'rotate(180deg)' : 'rotate(0deg)';
+    }
 }
 
 // ─── Boot ───
