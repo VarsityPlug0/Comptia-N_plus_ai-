@@ -837,7 +837,11 @@ function submitQuiz() {
         resultsList.push({
             questionId: q.id,
             isCorrect,
-            userAnswer: userAnswer
+            userAnswer: userAnswer,
+            correctAnswer: q.correctAnswers.join(', '),
+            selectedOptions: [...(userAnswers[i] || [])],
+            correctOptions: [...q.correctAnswers],
+            timeTaken: questionTimes[i] || 0
         });
 
         if (isCorrect) {
@@ -943,25 +947,160 @@ function prepareResults(score, total, incorrectList, levelUnlocked) {
         }
     }
 
-    // ... incorrect list ...
+    // ... incorrect list → Full Accordion Review ...
     const incorrectContainer = document.getElementById('results-incorrect');
-    if (incorrectList.length === 0) {
-        incorrectContainer.innerHTML = '<p class="perfect-score">🎉 Perfect Score! Great job!</p>';
-    } else {
-        let html = '<h3>Questions to Review</h3>';
-        for (const item of incorrectList) {
-            html += `
-                <div class="review-item">
-                    <div class="review-q"><strong>Q${item.questionId}:</strong> ${escapeHtml(item.questionText)}</div>
-                    <div class="review-answers">
-                        <span class="your-answer">Your answer: ${item.userAnswer}</span>
-                        <span class="correct-answer">Correct: ${item.correctAnswer}</span>
+    const resultsList = [];
+    for (let i = 0; i < currentSession.length; i++) {
+        const q = currentSession[i];
+        const selected = (userAnswers[i] || []).sort();
+        const correct = [...q.correctAnswers].sort();
+        const isCorrect = arraysEqual(selected, correct);
+        resultsList.push({
+            questionId: q.id,
+            isCorrect,
+            userAnswer: selected.join(', ') || 'No answer',
+            correctAnswer: q.correctAnswers.join(', '),
+            selectedOptions: [...(userAnswers[i] || [])],
+            correctOptions: [...q.correctAnswers],
+            timeTaken: questionTimes[i] || 0
+        });
+    }
+
+    incorrectContainer.innerHTML = renderAccordionReview(resultsList, 'results');
+}
+
+/**
+ * Renders a full accordion review from a resultsList array.
+ * @param {Array} results - Array of {questionId, isCorrect, userAnswer, correctAnswer, selectedOptions, correctOptions, timeTaken}
+ * @param {string} prefix - Unique prefix for IDs (e.g. 'results' or 'hist-3')
+ * @returns {string} HTML string
+ */
+function renderAccordionReview(results, prefix) {
+    if (!results || results.length === 0) return '<p class="empty-msg">No questions to review.</p>';
+
+    const totalCorrect = results.filter(r => r.isCorrect).length;
+    const totalQuestions = results.length;
+    const pctScore = Math.round((totalCorrect / totalQuestions) * 100);
+
+    let html = `
+        <div class="review-summary-bar">
+            <span><strong>${totalCorrect}</strong> / ${totalQuestions} correct (${pctScore}%)</span>
+            <div class="review-controls">
+                <button class="btn btn-secondary btn-sm" onclick="expandAllAccordion('${prefix}')">Expand All</button>
+                <button class="btn btn-secondary btn-sm" onclick="collapseAllAccordion('${prefix}')">Collapse All</button>
+            </div>
+        </div>
+    `;
+
+    for (let idx = 0; idx < results.length; idx++) {
+        const r = results[idx];
+        const q = allQuestions.find(item => item.id === r.questionId);
+        if (!q) continue;
+
+        const statusIcon = r.isCorrect ? '✓' : '✗';
+        const statusClass = r.isCorrect ? 'correct' : 'incorrect';
+        const timeStr = r.timeTaken ? `⏱ ${r.timeTaken.toFixed(1)}s` : '';
+
+        // Build options HTML
+        let optionsHtml = '';
+        if (q.options && q.options.length > 0) {
+            for (const opt of q.options) {
+                const wasSelected = (r.selectedOptions || []).includes(opt.letter);
+                const isCorrectOpt = (r.correctOptions || q.correctAnswers).includes(opt.letter);
+
+                let optClass = 'review-option';
+                let badge = '';
+                if (wasSelected && isCorrectOpt) {
+                    optClass += ' review-opt-correct-selected';
+                    badge = '<span class="review-opt-badge correct-badge">✓ Your Answer (Correct)</span>';
+                } else if (wasSelected && !isCorrectOpt) {
+                    optClass += ' review-opt-incorrect-selected';
+                    badge = '<span class="review-opt-badge incorrect-badge">✗ Your Answer</span>';
+                } else if (isCorrectOpt) {
+                    optClass += ' review-opt-correct';
+                    badge = '<span class="review-opt-badge correct-badge">✓ Correct Answer</span>';
+                }
+
+                optionsHtml += `
+                    <div class="${optClass}">
+                        <span class="review-opt-letter">${opt.letter}</span>
+                        <span class="review-opt-text">${escapeHtml(opt.text)}</span>
+                        ${badge}
+                    </div>
+                `;
+            }
+        }
+
+        html += `
+            <div class="review-accordion-item" data-prefix="${prefix}">
+                <div class="review-accordion-header" onclick="toggleAccordionItem(this)">
+                    <div class="review-accordion-left">
+                        <span class="review-status-icon ${statusClass}">${statusIcon}</span>
+                        <span class="review-q-num">Q${idx + 1}</span>
+                    </div>
+                    <div class="review-accordion-mid">
+                        <span class="review-summary-selected">You: <strong>${escapeHtml(r.userAnswer)}</strong></span>
+                        <span class="review-summary-correct">Correct: <strong>${escapeHtml(r.correctAnswer)}</strong></span>
+                    </div>
+                    <div class="review-accordion-right">
+                        <span class="review-result-label ${statusClass}">${r.isCorrect ? 'Correct' : 'Incorrect'}</span>
+                        ${timeStr ? `<span class="review-time">${timeStr}</span>` : ''}
+                        <span class="accordion-chevron">▼</span>
                     </div>
                 </div>
-            `;
-        }
-        incorrectContainer.innerHTML = html;
+                <div class="review-accordion-body" style="display:none">
+                    <div class="review-q-text">${escapeHtml(q.text)}</div>
+                    <div class="review-options-list">
+                        ${optionsHtml}
+                    </div>
+                    <div class="review-meta">
+                        <span>Selected Answer: <strong>${escapeHtml(r.userAnswer)}</strong></span>
+                        <span>Correct Answer: <strong>${escapeHtml(r.correctAnswer)}</strong></span>
+                        <span>Result: <strong class="${statusClass}">${r.isCorrect ? 'Correct' : 'Incorrect'}</strong></span>
+                    </div>
+                    <div class="review-actions">
+                        <button class="btn btn-ai btn-sm" onclick="handlePostExplainInHistory(${r.questionId}, '${prefix}')">💡 Explain</button>
+                        <div id="ai-hist-${prefix}-${r.questionId}" style="display:none; margin-top:8px" class="ai-response"></div>
+                    </div>
+                </div>
+            </div>
+        `;
     }
+
+    return html;
+}
+
+function toggleAccordionItem(headerEl) {
+    const body = headerEl.nextElementSibling;
+    const chevron = headerEl.querySelector('.accordion-chevron');
+    const isOpen = body.style.display !== 'none';
+    body.style.display = isOpen ? 'none' : 'block';
+    if (chevron) chevron.textContent = isOpen ? '▼' : '▲';
+    headerEl.classList.toggle('open', !isOpen);
+}
+
+function expandAllAccordion(prefix) {
+    document.querySelectorAll(`.review-accordion-item[data-prefix="${prefix}"] .review-accordion-body`).forEach(body => {
+        body.style.display = 'block';
+    });
+    document.querySelectorAll(`.review-accordion-item[data-prefix="${prefix}"] .accordion-chevron`).forEach(ch => {
+        ch.textContent = '▲';
+    });
+    document.querySelectorAll(`.review-accordion-item[data-prefix="${prefix}"] .review-accordion-header`).forEach(h => {
+        h.classList.add('open');
+    });
+}
+
+function collapseAllAccordion(prefix) {
+    document.querySelectorAll(`.review-accordion-item[data-prefix="${prefix}"] .review-accordion-body`).forEach(body => {
+        body.style.display = 'none';
+    });
+    document.querySelectorAll(`.review-accordion-item[data-prefix="${prefix}"] .accordion-chevron`).forEach(ch => {
+        ch.textContent = '▼';
+    });
+    document.querySelectorAll(`.review-accordion-item[data-prefix="${prefix}"] .review-accordion-header`).forEach(h => {
+        h.classList.remove('open');
+    });
 }
 
 function showResults() { showView('results'); }
@@ -1005,50 +1144,7 @@ function showDashboard() {
                     <tr id="details-${s.id}" class="history-details-row">
                         <td colspan="7">
                             <div class="history-detail-content">
-                                <h4>Session ${s.id} Details</h4>
-                                ${s.results.map((r, idx) => {
-                    const q = allQuestions.find(q => q.id === r.questionId);
-                    if (!q) return '';
-
-                    // Find user answer from incorrectLog if wrong, or infer if correct
-                    // Actually, we didn't store user answer in 'results', only in 'incorrectLog'
-                    // But wait, recordSession passes 'resultsList' which has {questionId, isCorrect}
-                    // We need to look up the answer in incorrectLog if incorrect.
-                    // For correct answers, we don't strictly have the user's input stored in 'results' unless we change recordSession.
-                    // Update: I updated progress.js to store 'results', but that array only had {questionId, isCorrect}.
-                    // I should have stored {questionId, isCorrect, userAnswer} in resultsList in quiz.js.
-                    // Let's assume for now we just show Correct/Incorrect status.
-
-                    // Wait, I can't easily show "Selected Answer" if it was correct (unless I infer it was the correct answer).
-                    // If incorrect, I can find it index progress.incorrectLog (but that's global log, not per session).
-                    // The session object has 'incorrectLog' (wait, no, progress has it).
-                    // Actually sessionData passed to recordSession had 'incorrect'.
-                    // But we didn't store the full 'incorrect' list IN the session object in progress.js, only appended to global log.
-                    // Fix: I need to update recordSession in progress.js to store 'incorrect' list in the session object too if I want per-session details.
-
-                    return `
-                                        <div class="detail-item">
-                                            <div class="detail-header">
-                                                <span>Q${idx + 1} (ID: ${q.id})</span>
-                                                <span class="detail-status ${r.isCorrect ? 'correct' : 'incorrect'}">
-                                                    ${r.isCorrect ? 'Correct' : 'Incorrect'}
-                                                </span>
-                                            </div>
-                                            <div class="detail-q">${escapeHtml(q.text)}</div>
-                                            <div class="detail-a">
-                                                <span class="${r.isCorrect ? 'correct-answer' : 'your-answer'}">
-                                                    You: ${r.userAnswer || 'N/A'}
-                                                </span>
-                                                ${!r.isCorrect ? `<span class="correct-answer">Correct: ${q.correctAnswers.join(', ')}</span>` : ''}
-                                                <span class="detail-time" style="float:right; opacity:0.7; font-size:0.8em">⏱ ${r.timeTaken ? r.timeTaken.toFixed(1) + 's' : '-'}</span>
-                                            </div>
-                                            <div style="margin-top:8px">
-                                                <button class="btn btn-ai btn-sm" onclick="handlePostExplainInHistory(${r.questionId}, '${s.id}')">💡 Explain</button>
-                                            </div>
-                                            <div id="ai-hist-${s.id}-${r.questionId}" style="display:none; margin-top:8px" class="ai-response"></div>
-                                        </div>
-                                    `;
-                }).join('')}
+                                ${renderAccordionReview(s.results, 'hist-' + s.id)}
                             </div>
                         </td>
                     </tr>
