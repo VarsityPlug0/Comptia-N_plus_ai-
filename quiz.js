@@ -705,16 +705,28 @@ function renderQuestion() {
         `;
     }
 
-    // Save current panel state before replacing DOM
-    const _prevPre = document.getElementById(`ai-pre-response-${currentQuestionIndex}`);
-    const _prevPost = document.getElementById(`ai-post-response-${currentQuestionIndex}`);
-    if (!openPanels[currentQuestionIndex]) openPanels[currentQuestionIndex] = {};
-    if (_prevPre) openPanels[currentQuestionIndex].pre = { open: _prevPre.style.display !== 'none', html: _prevPre.innerHTML };
-    if (_prevPost) openPanels[currentQuestionIndex].post = { open: _prevPost.style.display !== 'none', html: _prevPost.innerHTML };
+    // Save state of whichever ai-response divs are currently in the DOM.
+    // We MUST scan by class (not by currentQuestionIndex) because next/prevQuestion()
+    // increments the index BEFORE calling renderQuestion(), so currentQuestionIndex
+    // already points to the NEW question — the old elements are still in the DOM.
+    document.querySelectorAll('.ai-response').forEach(div => {
+        const preMatch = div.id.match(/^ai-pre-response-(\d+)$/);
+        const postMatch = div.id.match(/^ai-post-response-(\d+)$/);
+        if (preMatch) {
+            const i = parseInt(preMatch[1]);
+            if (!openPanels[i]) openPanels[i] = {};
+            openPanels[i].pre = { open: div.style.display !== 'none', html: div.innerHTML };
+        }
+        if (postMatch) {
+            const i = parseInt(postMatch[1]);
+            if (!openPanels[i]) openPanels[i] = {};
+            openPanels[i].post = { open: div.style.display !== 'none', html: div.innerHTML };
+        }
+    });
 
     container.innerHTML = html;
 
-    // Restore panel state for this question if it was previously opened
+    // Restore panel state for the newly rendered question
     const _saved = openPanels[currentQuestionIndex];
     if (_saved) {
         const _preDiv = document.getElementById(`ai-pre-response-${currentQuestionIndex}`);
