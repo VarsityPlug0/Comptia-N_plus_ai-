@@ -18,6 +18,10 @@ let questionStartTime = 0; // Tracks when the current question was displayed
 let questionTimes = {}; // Stores time taken (in seconds) for each question index
 const QUESTIONS_PER_SESSION = 10;
 
+// Tracks which AI response panels are open + their HTML content (per question index)
+// { [questionIndex]: { pre: { open: bool, html: string }, post: { open: bool, html: string } } }
+let openPanels = {};
+
 // ─── Initialization ───
 async function initApp() {
     showView('loading');
@@ -578,6 +582,7 @@ function beginSession() {
     currentQuestionIndex = 0;
     userAnswers = {};
     questionTimes = {};
+    openPanels = {};
     sessionSubmitted = false;
     document.getElementById('exam-timer-bar').style.display = 'none';
     renderQuestion();
@@ -588,6 +593,7 @@ function beginExamSession() {
     currentQuestionIndex = 0;
     userAnswers = {};
     questionTimes = {};
+    openPanels = {};
     sessionSubmitted = false;
 
     const config = getConfig();
@@ -699,7 +705,24 @@ function renderQuestion() {
         `;
     }
 
+    // Save current panel state before replacing DOM
+    const _prevPre = document.getElementById(`ai-pre-response-${currentQuestionIndex}`);
+    const _prevPost = document.getElementById(`ai-post-response-${currentQuestionIndex}`);
+    if (!openPanels[currentQuestionIndex]) openPanels[currentQuestionIndex] = {};
+    if (_prevPre) openPanels[currentQuestionIndex].pre = { open: _prevPre.style.display !== 'none', html: _prevPre.innerHTML };
+    if (_prevPost) openPanels[currentQuestionIndex].post = { open: _prevPost.style.display !== 'none', html: _prevPost.innerHTML };
+
     container.innerHTML = html;
+
+    // Restore panel state for this question if it was previously opened
+    const _saved = openPanels[currentQuestionIndex];
+    if (_saved) {
+        const _preDiv = document.getElementById(`ai-pre-response-${currentQuestionIndex}`);
+        const _postDiv = document.getElementById(`ai-post-response-${currentQuestionIndex}`);
+        if (_preDiv && _saved.pre && _saved.pre.open) { _preDiv.style.display = 'block'; _preDiv.innerHTML = _saved.pre.html; }
+        if (_postDiv && _saved.post && _saved.post.open) { _postDiv.style.display = 'block'; _postDiv.innerHTML = _saved.post.html; }
+    }
+
     updateNavButtons();
     questionStartTime = Date.now(); // Start timer for this question
 }
@@ -719,6 +742,9 @@ async function handlePreExplain(idx) {
 
     const result = await aiExplainQuestion(q.text, q.options, q.explanation, q.correctAnswers);
     responseDiv.innerHTML = modeToggle + `<div class="ai-text">${formatAiText(result.text)}</div>`;
+    // Persist content so it survives navigation
+    if (!openPanels[idx]) openPanels[idx] = {};
+    openPanels[idx].pre = { open: true, html: responseDiv.innerHTML };
 }
 
 async function handlePostExplain(idx) {
@@ -735,6 +761,9 @@ async function handlePostExplain(idx) {
 
     const result = await aiExplainAnswer(q.text, q.correctAnswers.join(', '), q.explanation);
     responseDiv.innerHTML = modeToggle + `<div class="ai-text">${formatAiText(result.text)}</div>`;
+    // Persist content so it survives navigation
+    if (!openPanels[idx]) openPanels[idx] = {};
+    openPanels[idx].post = { open: true, html: responseDiv.innerHTML };
 }
 
 function setExplainMode(mode, idx, type) {
