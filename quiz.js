@@ -1027,8 +1027,8 @@ function renderAccordionReview(results, prefix) {
         <div class="review-summary-bar">
             <span><strong>${totalCorrect}</strong> / ${totalQuestions} correct (${pctScore}%)</span>
             <div class="review-controls">
-                <button class="btn btn-secondary btn-sm" onclick="expandAllAccordion('${prefix}')">Expand All</button>
-                <button class="btn btn-secondary btn-sm" onclick="collapseAllAccordion('${prefix}')">Collapse All</button>
+                <button class="btn btn-secondary btn-sm" onclick="expandAllAccordion('${prefix}'); event.stopPropagation();">Expand All</button>
+                <button class="btn btn-secondary btn-sm" onclick="collapseAllAccordion('${prefix}'); event.stopPropagation();">Collapse All</button>
             </div>
         </div>
     `;
@@ -1074,7 +1074,7 @@ function renderAccordionReview(results, prefix) {
 
         html += `
             <div class="review-accordion-item" data-prefix="${prefix}">
-                <div class="review-accordion-header" onclick="toggleAccordionItem(this)">
+                <div class="review-accordion-header" onclick="toggleAccordionItem(this); event.stopPropagation();">
                     <div class="review-accordion-left">
                         <span class="review-status-icon ${statusClass}">${statusIcon}</span>
                         <span class="review-q-num">Q${idx + 1}</span>
@@ -1100,7 +1100,7 @@ function renderAccordionReview(results, prefix) {
                         <span>Result: <strong class="${statusClass}">${r.isCorrect ? 'Correct' : 'Incorrect'}</strong></span>
                     </div>
                     <div class="review-actions">
-                        <button class="btn btn-ai btn-sm" onclick="handlePostExplainInHistory(${r.questionId}, '${prefix}')">💡 Explain</button>
+                        <button class="btn btn-ai btn-sm" onclick="handlePostExplainInHistory(${r.questionId}, '${prefix}'); event.stopPropagation();">💡 Explain</button>
                         <div id="ai-hist-${prefix}-${r.questionId}" style="display:none; margin-top:8px" class="ai-response"></div>
                     </div>
                 </div>
@@ -1228,8 +1228,8 @@ function showDashboard() {
             const hasDetails = s.results && s.results.length > 0;
 
             return `
-                <div class="session-card" onclick="toggleSessionCardDetails(this)">
-                    <div class="session-card-header">
+                <div class="session-card">
+                    <div class="session-card-header" onclick="toggleSessionCardDetails(this.closest('.session-card'))" style="cursor:pointer">
                         <div class="session-card-left">
                             <span class="session-card-id">#${s.id}</span>
                             <span class="session-card-date">${s.date}</span>
@@ -1239,7 +1239,7 @@ function showDashboard() {
                             <span class="session-card-score">${s.score}/${s.total}</span>
                         </div>
                     </div>
-                    <div class="session-card-meta">
+                    <div class="session-card-meta" onclick="toggleSessionCardDetails(this.closest('.session-card'))" style="cursor:pointer">
                         <span>Q${s.startQ}–Q${s.endQ}</span>
                         <span class="mode-badge-sm">${s.mode || 'normal'}</span>
                         <button class="btn btn-secondary btn-sm" onclick="redoSet(${s.startQ - 1}); event.stopPropagation();">🔄</button>
