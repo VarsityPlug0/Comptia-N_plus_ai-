@@ -892,7 +892,8 @@ function submitQuiz() {
                 questionId: q.id,
                 questionText: q.text,
                 userAnswer: userAnswer,
-                correctAnswer: q.correctAnswers.join(', ')
+                correctAnswer: q.correctAnswers.join(', '),
+                explanation: q.explanation || ''
             });
         }
     }
@@ -1144,7 +1145,7 @@ function collapseAllAccordion(prefix) {
     });
 }
 
-function showResults() { showView('results'); }
+// Note: showResults(score, total, incorrectList, levelUnlocked) is defined above at line ~933
 
 function goHome() { refreshHomeStats(); showView('home'); }
 
@@ -1263,9 +1264,10 @@ function showDashboard() {
                 <div class="review-item">
                     <div class="review-q"><strong>Q${item.questionId}:</strong> ${escapeHtml(item.questionText)}</div>
                     <div class="review-answers">
-                        <span class="your-answer">You: ${item.userAnswer}</span>
-                        <span class="correct-answer">Correct: ${item.correctAnswer}</span>
+                        <span class="your-answer">You answered: <strong>${escapeHtml(item.userAnswer)}</strong></span>
+                        <span class="correct-answer">Correct answer: <strong>${escapeHtml(item.correctAnswer)}</strong></span>
                     </div>
+                    ${item.explanation ? `<div class="review-explanation"><strong>Why:</strong> ${escapeHtml(item.explanation)}</div>` : ''}
                 </div>
             `;
         }

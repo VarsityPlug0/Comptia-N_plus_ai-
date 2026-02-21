@@ -786,6 +786,22 @@ body {
     border-radius: 4px;
 }
 
+.review-explanation {
+    margin-top: 10px;
+    padding: 10px 12px;
+    background: rgba(245, 158, 11, 0.08);
+    border-left: 3px solid var(--amber);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    font-size: 0.8125rem;
+    color: var(--text-secondary);
+    line-height: 1.6;
+}
+
+.review-explanation strong {
+    color: var(--amber);
+    margin-right: 4px;
+}
+
 /* ─── Dashboard ─── */
 .section-title {
     font-size: 1.0625rem;
